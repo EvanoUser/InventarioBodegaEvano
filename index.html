@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>EventTech Bodega</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f6fa;--bg2:#fff;--bg3:#fafafa;--bg-hover:#f8f5ff;
+  --border:#e2e8f0;--border2:#e8e8f5;
+  --text:#1a1a2e;--text2:#666;--text3:#999;
+  --card-shadow:0 1px 4px #0000000a;--modal-shadow:0 20px 60px #0000001a;
+  --modal-bg:#fff;--overlay:#00000066;
+  --input-bg:#fff;--input-focus-shadow:0 0 0 3px #ede9fe;
+  --th-bg:#fafafa;--td-hover:#faf8ff;--td-border:#f5f5fa;
+  --cal-day:#fff;--cal-hover:#f8f5ff;--cal-today:#faf5ff;
+  --scrollbar-track:#f0f0f5;--scrollbar-thumb:#d0d0e0;
+  --ghost-bg:#fff;--ghost-color:#6d28d9;--ghost-border:#ddd6fe;--ghost-hover:#ede9fe;
+  --nav-hover:#ebebf5;--nav-active:#ede9fe;--nav-active-color:#6d28d9;--nav-color:#666;
+  --sep:#f0f0f8;--header-bg:#fff;--header-shadow:0 1px 0 #e8e8f5;
+  --sr-bg:#fff;--sr-hover:#f8f5ff;--sr-text:#1a1a2e;
+  --item-bg:#f8f8ff;--item-border:#e2e8f0;
+  --accent:#6d28d9;
+}
+[data-theme="dark"]{
+  --bg:#0a0a14;--bg2:#12121e;--bg3:#0f0f1a;--bg-hover:#1a1a28;
+  --border:#2a2a45;--border2:#1e1e35;
+  --text:#e8e8f0;--text2:#999;--text3:#555;
+  --card-shadow:none;--modal-shadow:0 20px 60px #00000066;
+  --modal-bg:#10101c;--overlay:#000000bb;
+  --input-bg:#12121e;--input-focus-shadow:0 0 0 3px #2a1a4a;
+  --th-bg:#0d0d18;--td-hover:#0f0f1a;--td-border:#0f0f1e;
+  --cal-day:#12121e;--cal-hover:#1a1a28;--cal-today:#1a0f2e;
+  --scrollbar-track:#0a0a14;--scrollbar-thumb:#2a2a40;
+  --ghost-bg:#1e1e35;--ghost-color:#a78bfa;--ghost-border:#2a2a45;--ghost-hover:#2a2a45;
+  --nav-hover:#1a1a28;--nav-active:#1e1e35;--nav-active-color:#a78bfa;--nav-color:#888;
+  --sep:#1e1e35;--header-bg:#0a0a14;--header-shadow:0 1px 0 #1e1e35;
+  --sr-bg:#0a0a14;--sr-hover:#1a1a28;--sr-text:#e8e8f0;
+  --item-bg:#0f0f1a;--item-border:#1e1e35;
+  --accent:#a78bfa;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans','Segoe UI',sans-serif;min-height:100vh;transition:background .3s,color .3s}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--scrollbar-track)}
+::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border-radius:3px}
+input,select,textarea{outline:none}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{opacity:1;height:36px;cursor:pointer}
+.btn{padding:9px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:all .18s;font-family:inherit;white-space:nowrap}
+.btn-primary{background:#6d28d9;color:#fff}.btn-primary:hover{background:#7c3aed}
+.btn-danger{background:#dc2626;color:#fff}.btn-danger:hover{background:#b91c1c}
+.btn-ghost{background:var(--ghost-bg);color:var(--ghost-color);border:1px solid var(--ghost-border)}.btn-ghost:hover{background:var(--ghost-hover)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.nav-btn{background:none;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:all .2s;color:var(--nav-color);display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap}
+.nav-btn:hover{background:var(--nav-hover);color:var(--text)}
+.nav-btn.active{background:var(--nav-active);color:var(--nav-active-color)}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge-ok{background:#dcfce7;color:#16a34a;border:1px solid #86efac}
+.badge-mant{background:#fef9c3;color:#ca8a04;border:1px solid #fde047}
+.badge-no{background:#fee2e2;color:#dc2626;border:1px solid #fca5a5}
+.badge-inactivo{background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1}
+.badge-baja{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+[data-theme="dark"] .badge-ok{background:#14532d44;color:#4ade80;border-color:#4ade8033}
+[data-theme="dark"] .badge-mant{background:#78350f44;color:#fbbf24;border-color:#fbbf2433}
+[data-theme="dark"] .badge-no{background:#7f1d1d44;color:#f87171;border-color:#f8717133}
+[data-theme="dark"] .badge-inactivo{background:#1e293b44;color:#94a3b8;border-color:#33415544}
+[data-theme="dark"] .badge-baja{background:#7f1d1d33;color:#fca5a5;border-color:#f8717122}
+.input{background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;font-size:15px;width:100%;transition:border .2s;font-family:inherit}
+.input:focus{border-color:#6d28d9;box-shadow:var(--input-focus-shadow)}
+.input-num{width:90px;text-align:center;padding:8px 4px;font-size:15px;font-weight:600}
+.card{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;box-shadow:var(--card-shadow);transition:background .3s}
+.modal-overlay{position:fixed;inset:0;background:var(--overlay);z-index:100;display:flex;align-items:flex-end;justify-content:center;padding:0}
+.modal{background:var(--modal-bg);border:1px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:600px;max-height:92vh;overflow-y:auto;box-shadow:var(--modal-shadow);padding:28px 20px 40px}
+@media(min-width:640px){
+  .modal-overlay{align-items:center;padding:20px}
+  .modal{border-radius:16px;padding:28px;max-height:90vh}
+}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;min-width:800px}
+th{padding:10px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border2);background:var(--th-bg);white-space:nowrap}
+td{padding:12px;font-size:13px;border-bottom:1px solid var(--td-border);vertical-align:middle}
+tr:hover td{background:var(--td-hover)}
+.cal-day{border:1px solid var(--border2);border-radius:6px;min-height:64px;padding:5px;transition:background .15s;background:var(--cal-day)}
+.cal-day.has-ev{cursor:pointer}.cal-day.has-ev:hover{background:var(--cal-hover)}
+.cal-day.today{border-color:#6d28d9;background:var(--cal-today)}
+.cal-pill{font-size:9px;font-weight:600;border-radius:3px;padding:1px 4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sep{height:1px;background:var(--sep);margin:14px 0}
+.tag{font-size:11px;padding:2px 7px;border-radius:20px;display:inline-block;margin:1px}
+.row2{display:flex;gap:12px}
+.row2>*{flex:1;min-width:0}
+.row3{display:flex;gap:12px}
+.row3>*{flex:1;min-width:0}
+.label{font-size:12px;color:var(--text2);display:block;margin-bottom:6px}
+.header{border-bottom:1px solid var(--border2);padding:0 16px;display:flex;align-items:center;gap:8px;height:56px;position:sticky;top:0;background:var(--header-bg);z-index:50;box-shadow:var(--header-shadow)}
+.header-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;color:var(--accent);white-space:nowrap}
+.nav-wrap{display:flex;gap:2px;overflow-x:auto;flex:1;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.nav-wrap::-webkit-scrollbar{display:none}
+.page{padding:16px;max-width:1280px;margin:0 auto}
+@media(min-width:768px){.page{padding:24px}}
+.sec-hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.ev-grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:600px){.ev-grid{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}}
+.ubic-grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:520px){.ubic-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes toastin{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal{animation:slideup .25s ease}
+@media(min-width:640px){.modal{animation:none}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+(function(){
+const {useState,useMemo,useEffect,useCallback} = React;
+const {createRoot} = ReactDOM;
+
+const SURL="https://ggiqsmdjbjczyrsqjvmq.supabase.co";
+const SKEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnaXFzbWRqYmpjenlyc3Fqdm1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NzAyMDIsImV4cCI6MjA4OTQ0NjIwMn0.Srebi_ssv_ct0OUKG9a45oqM0B49wkbbRGMeZH2Omkc";
+
+const sb=async(path,opts={})=>{
+  const {prefer,headers:xh,...rest}=opts;
+  const res=await fetch(`${SURL}/rest/v1/${path}`,{
+    headers:{"apikey":SKEY,"Authorization":`Bearer ${SKEY}`,"Content-Type":"application/json","Prefer":prefer||"return=representation",...xh},
+    ...rest
+  });
+  if(!res.ok){const e=await res.text();throw new Error(e);}
+  const t=await res.text();return t?JSON.parse(t):null;
+};
+
+const api={
+  getInventario:()=>sb("inventario?order=created_at.asc"),
+  createItem:(d)=>sb("inventario",{method:"POST",body:JSON.stringify(d)}),
+  updateItem:(id,d)=>sb(`inventario?id=eq.${id}`,{method:"PATCH",body:JSON.stringify(d)}),
+  deleteItem:(id)=>sb(`inventario?id=eq.${id}`,{method:"DELETE",prefer:"return=minimal"}),
+  getEventos:()=>sb("eventos?order=fecha.asc"),
+  createEvento:(d)=>sb("eventos",{method:"POST",body:JSON.stringify(d)}),
+  updateEvento:(id,d)=>sb(`eventos?id=eq.${id}`,{method:"PATCH",body:JSON.stringify(d)}),
+  deleteEvento:(id)=>sb(`eventos?id=eq.${id}`,{method:"DELETE",prefer:"return=minimal"}),
+  getEeqs:()=>sb("evento_equipos?order=id.asc"),
+  setEeqs:async(evId,eqs)=>{
+    await sb(`evento_equipos?evento_id=eq.${evId}`,{method:"DELETE",prefer:"return=minimal"});
+    if(eqs.length>0) await sb("evento_equipos",{method:"POST",body:JSON.stringify(eqs.map(e=>({evento_id:evId,inventario_id:e.inventario_id,cantidad:e.cantidad})))});
+  }
+};
+
+const MONTHS=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const DAYS=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+const fmt=n=>new Intl.NumberFormat("es-EC",{style:"currency",currency:"USD",minimumFractionDigits:2}).format(n||0);
+const fmtD=d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;};
+
+function NumInput({value,onChange,min=0,max,className="input",style={}}){
+  const [local,setLocal]=useState(String(value??0));
+  useEffect(()=>{setLocal(String(value??0));},[value]);
+  return <input
+    type="number" inputMode="numeric"
+    className={className} style={style}
+    value={local} min={min} max={max}
+    onChange={e=>{
+      const v=e.target.value;setLocal(v);
+      const n=parseFloat(v);
+      if(!isNaN(n)) onChange(max!==undefined?Math.min(n,max):n);
+    }}
+    onBlur={()=>{
+      const n=parseFloat(local);
+      const safe=isNaN(n)?0:Math.max(min,max!==undefined?Math.min(n,max):n);
+      setLocal(String(safe));onChange(safe);
+    }}
+  />;
+}
+
+const ESTATUS_OPTS=["activo","inactivo","baja"];
+
+function EstatusBadge({estatus}){
+  if(!estatus||estatus==="activo") return <span className="badge badge-ok">✓ Activo</span>;
+  if(estatus==="inactivo") return <span className="badge badge-inactivo">⏸ Inactivo</span>;
+  if(estatus==="baja") return <span className="badge badge-baja">✕ Baja</span>;
+  return <span className="badge badge-inactivo">{estatus}</span>;
+}
+
+function App(){
+  const [view,setView]=useState("inventario");
+  const [inventory,setInventory]=useState([]);
+  const [events,setEvents]=useState([]);
+  const [eeqs,setEeqs]=useState([]);
+  const [modal,setModal]=useState(null);
+  const [calYear,setCalYear]=useState(new Date().getFullYear());
+  const [calMonth,setCalMonth]=useState(new Date().getMonth());
+  const [search,setSearch]=useState("");
+  const [filterEstado,setFilterEstado]=useState("todos");
+  const [filterEstatus,setFilterEstatus]=useState("todos");
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+  const [toast,setToast]=useState(null);
+  const [dark,setDark]=useState(()=>localStorage.getItem("theme")==="dark");
+
+  useEffect(()=>{
+    document.documentElement.setAttribute("data-theme",dark?"dark":"light");
+    localStorage.setItem("theme",dark?"dark":"light");
+  },[dark]);
+
+  const showToast=(msg,type="ok")=>{setToast({msg,type});setTimeout(()=>setToast(null),3500);};
+
+  const loadAll=useCallback(async()=>{
+    setLoading(true);
+    try{
+      const [inv,evs,eq]=await Promise.all([api.getInventario(),api.getEventos(),api.getEeqs()]);
+      setInventory(inv||[]);setEvents(evs||[]);setEeqs(eq||[]);
+    }catch(e){showToast("Error al cargar: "+e.message,"err");}
+    setLoading(false);
+  },[]);
+
+  useEffect(()=>{loadAll();},[]);
+
+  const saveItem=async(item)=>{
+    setSaving(true);
+    try{
+      const{id,created_at,...data}=item;
+      if(id){await api.updateItem(id,data);showToast("Equipo actualizado");}
+      else{await api.createItem(data);showToast("Equipo creado");}
+      await loadAll();setModal(null);
+    }catch(e){showToast("Error: "+e.message,"err");}
+    setSaving(false);
+  };
+
+  const deleteItem=async(id)=>{
+    setSaving(true);
+    try{await api.deleteItem(id);showToast("Equipo eliminado");await loadAll();setModal(null);}
+    catch(e){showToast("Error: "+e.message,"err");}
+    setSaving(false);
+  };
+
+  const saveEvent=async(ev)=>{
+    setSaving(true);
+    try{
+      const{id,created_at,...data}=ev;
+      if(id){await api.updateEvento(id,data);showToast("Evento actualizado");}
+      else{await api.createEvento(data);showToast("Evento creado");}
+      await loadAll();setModal(null);
+    }catch(e){showToast("Error: "+e.message,"err");}
+    setSaving(false);
+  };
+
+  const deleteEvent=async(id)=>{
+    setSaving(true);
+    try{await api.deleteEvento(id);showToast("Evento eliminado");await loadAll();setModal(null);}
+    catch(e){showToast("Error: "+e.message,"err");}
+    setSaving(false);
+  };
+
+  const saveEeqs=async(evId,eqs)=>{
+    setSaving(true);
+    try{await api.setEeqs(evId,eqs);showToast("Equipos guardados");await loadAll();setModal(null);}
+    catch(e){showToast("Error: "+e.message,"err");}
+    setSaving(false);
+  };
+
+  const todayDate=new Date();todayDate.setHours(0,0,0,0);
+  const isPast=ev=>{const fin=new Date(ev.fecha_fin||ev.fecha);fin.setHours(23,59,59,999);return fin<todayDate;};
+  const activeEeqs=eeqs.filter(eq=>{const ev=events.find(e=>e.id===eq.evento_id);return ev&&!isPast(ev);});
+
+  const getEvEqs=eid=>eeqs.filter(e=>e.evento_id===eid);
+  const getEqEvs=iid=>events.filter(ev=>!isPast(ev)&&eeqs.some(e=>e.evento_id===ev.id&&e.inventario_id===iid));
+  const getUsed=(iid,exEv=null)=>activeEeqs.filter(e=>e.inventario_id===iid&&e.evento_id!==exEv).reduce((s,e)=>s+e.cantidad,0);
+  const getMant=iid=>{const it=inventory.find(i=>i.id===iid);return it?(it.cantidad_mantenimiento||0):0;};
+  const getAvail=(iid,exEv=null)=>{const it=inventory.find(i=>i.id===iid);return it?Math.max(0,it.cantidad-getUsed(iid,exEv)-getMant(iid)):0;};
+
+  const getDIM=(y,m)=>new Date(y,m+1,0).getDate();
+  const getFD=(y,m)=>new Date(y,m,1).getDay();
+  const getEvDay=day=>{
+    const d=`${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    return events.filter(ev=>d>=ev.fecha&&d<=(ev.fecha_fin||ev.fecha));
+  };
+
+  const printEvent=ev=>{
+    const eqs=getEvEqs(ev.id);
+    const rows=eqs.map(eq=>{const it=inventory.find(i=>i.id===eq.inventario_id);return it?`<tr><td>${it.nombre}</td><td>${it.descripcion||""}</td><td style="text-align:center">${eq.cantidad}</td><td style="text-align:right">${fmt(it.precio*eq.cantidad)}</td></tr>`:""}).join("");
+    const total=eqs.reduce((s,eq)=>{const it=inventory.find(i=>i.id===eq.inventario_id);return s+(it?it.precio*eq.cantidad:0);},0);
+    const win=window.open("","_blank");
+    win.document.write(`<!DOCTYPE html><html><head><title>${ev.nombre}</title><style>body{font-family:'Segoe UI',sans-serif;padding:32px;color:#111;max-width:900px;margin:0 auto}h1{font-size:24px;margin-bottom:4px}.meta{color:#555;margin-bottom:20px;font-size:13px;line-height:2}table{width:100%;border-collapse:collapse}th{background:#111;color:#fff;padding:10px 14px;text-align:left;font-size:12px;text-transform:uppercase}td{padding:9px 14px;border-bottom:1px solid #eee;font-size:13px}tr:nth-child(even) td{background:#f9f9ff}.total{font-size:16px;font-weight:700;text-align:right;margin-top:18px}.dot{display:inline-block;width:10px;height:10px;border-radius:2px;background:${ev.color};margin-right:6px;vertical-align:middle}@media print{.noprint{display:none}}</style></head><body><button class="noprint" onclick="window.print()" style="margin-bottom:16px;padding:8px 18px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨 Imprimir</button><h1><span class="dot"></span>${ev.nombre}</h1><div class="meta"><b>Cliente:</b> ${ev.cliente||"—"}<br><b>Lugar:</b> ${ev.lugar||"—"}<br><b>Fecha:</b> ${fmtD(ev.fecha)}${ev.fecha_fin&&ev.fecha_fin!==ev.fecha?` al ${fmtD(ev.fecha_fin)}`:""}</div><table><thead><tr><th>Equipo</th><th>Descripción</th><th style="text-align:center">Cant.</th><th style="text-align:right">Valor</th></tr></thead><tbody>${rows||"<tr><td colspan='4' style='text-align:center;color:#aaa;padding:20px'>Sin equipos asignados</td></tr>"}</tbody></table><div class="total">Total: ${fmt(total)}</div></body></html>`);
+    win.document.close();
+  };
+
+  const filtInv=useMemo(()=>inventory.filter(it=>{
+    const ms=it.nombre?.toLowerCase().includes(search.toLowerCase())||it.descripcion?.toLowerCase().includes(search.toLowerCase());
+    let me=true;
+    if(filterEstado==="mantenimiento") me=(it.cantidad_mantenimiento||0)>0;
+    else if(filterEstado==="disponible") me=getAvail(it.id)>0;
+    else if(filterEstado==="no-disponible") me=getAvail(it.id)===0;
+    let ms2=true;
+    if(filterEstatus!=="todos") ms2=(it.estatus||"activo")===filterEstatus;
+    return ms&&me&&ms2;
+  }),[inventory,eeqs,events,search,filterEstado,filterEstatus]);
+
+  if(loading) return(
+    <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
+      <div style={{width:40,height:40,border:"3px solid var(--border)",borderTop:"3px solid #6d28d9",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+      <div style={{color:"var(--text2)",fontFamily:"'DM Sans',sans-serif"}}>Conectando con Supabase...</div>
+    </div>
+  );
+
+  return <div>
+    {toast&&<div style={{position:"fixed",bottom:24,right:16,zIndex:999,padding:"12px 18px",borderRadius:10,background:toast.type==="err"?"#7f1d1d":"#14532d",color:"#fff",fontSize:14,fontWeight:600,animation:"toastin .3s ease",border:`1px solid ${toast.type==="err"?"#ef4444":"#22c55e"}`,maxWidth:"calc(100vw - 32px)"}}>{toast.type==="err"?"❌ ":"✓ "}{toast.msg}</div>}
+
+    <div className="header">
+      <div className="header-title">⚡ Inventario Evano</div>
+      <div className="nav-wrap">
+        {[{id:"inventario",icon:"📦",label:"Inventario"},{id:"eventos",icon:"🎪",label:"Eventos"},{id:"calendario",icon:"📅",label:"Calendario"},{id:"ubicacion",icon:"🔍",label:"Ubicación"}].map(v=>(
+          <button key={v.id} className={`nav-btn ${view===v.id?"active":""}`} onClick={()=>setView(v.id)}>{v.icon} {v.label}</button>
+        ))}
+      </div>
+      <button className="btn btn-ghost btn-sm" onClick={loadAll} title="Sincronizar" style={{flexShrink:0}}>↻</button>
+      <button className="btn btn-ghost btn-sm" onClick={()=>setDark(d=>!d)} style={{flexShrink:0,fontSize:15,padding:"6px 10px"}}>{dark?"☀️":"🌙"}</button>
+    </div>
+
+    <div className="page">
+
+      {/* ===== INVENTARIO ===== */}
+      {view==="inventario"&&<div>
+        <div className="sec-hdr">
+          <div>
+            <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700}}>Inventario General</h2>
+            <p style={{color:"var(--text2)",fontSize:13,marginTop:2}}>{inventory.length} equipos registrados</p>
+          </div>
+          <button className="btn btn-primary" onClick={()=>setModal({type:"item",data:null})}>+ Nuevo Equipo</button>
+        </div>
+
+        <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+          <input className="input" style={{flex:"1 1 200px"}} placeholder="🔎 Buscar equipo..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          <select className="input" style={{flex:"0 1 180px"}} value={filterEstado} onChange={e=>setFilterEstado(e.target.value)}>
+            <option value="todos">Todos los estados</option>
+            <option value="disponible">Disponible</option>
+            <option value="mantenimiento">Con mantenimiento</option>
+            <option value="no-disponible">Sin stock</option>
+          </select>
+          <select className="input" style={{flex:"0 1 160px"}} value={filterEstatus} onChange={e=>setFilterEstatus(e.target.value)}>
+            <option value="todos">Todos los estatus</option>
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+
+        <div className="card table-wrap">
+          <table>
+            <thead><tr>
+              <th>Equipo</th><th>Descripción</th><th>Precio</th>
+              <th style={{textAlign:"center"}}>Total</th>
+              <th style={{textAlign:"center"}}>🔧 Mant.</th>
+              <th style={{textAlign:"center"}}>🎪 Eventos</th>
+              <th style={{textAlign:"center"}}>✓ Libre</th>
+              <th>Adquisición</th>
+              <th>Estatus</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr></thead>
+            <tbody>
+              {filtInv.map(item=>{
+                const avail=getAvail(item.id);
+                const used=getUsed(item.id);
+                const mant=item.cantidad_mantenimiento||0;
+                const inEvs=getEqEvs(item.id);
+                return <tr key={item.id}>
+                  <td>
+                    <div style={{fontWeight:600}}>{item.nombre}</div>
+                    {inEvs.length>0&&<div style={{marginTop:3}}>{inEvs.map(ev=><span key={ev.id} className="tag" style={{background:ev.color+"22",color:ev.color,border:`1px solid ${ev.color}44`}}>{ev.nombre}</span>)}</div>}
+                  </td>
+                  <td style={{color:"var(--text2)",maxWidth:160}}>{item.descripcion}{item.dueno&&<div style={{fontSize:11,color:"var(--accent)",marginTop:2}}>👤 {item.dueno}</div>}</td>
+                  <td style={{color:"var(--accent)",fontWeight:600,whiteSpace:"nowrap"}}>{fmt(item.precio)}</td>
+                  <td style={{textAlign:"center",fontWeight:700}}>{item.cantidad}</td>
+                  <td style={{textAlign:"center"}}>{mant>0?<span style={{color:"#f59e0b",fontWeight:700}}>{mant}</span>:<span style={{color:"var(--text3)"}}>—</span>}</td>
+                  <td style={{textAlign:"center"}}>{used>0?<span style={{color:"#7c3aed",fontWeight:700}}>{used}</span>:<span style={{color:"var(--text3)"}}>—</span>}</td>
+                  <td style={{textAlign:"center"}}><span style={{color:avail===0?"#f87171":avail<item.cantidad*0.3?"#f59e0b":"#16a34a",fontWeight:700}}>{avail}</span></td>
+                  <td style={{color:"var(--text2)",whiteSpace:"nowrap",fontSize:12}}>{item.fecha_adquisicion?fmtD(item.fecha_adquisicion):<span style={{color:"var(--text3)"}}>—</span>}</td>
+                  <td><EstatusBadge estatus={item.estatus}/></td>
+                  <td>{(()=>{
+                    if(avail===0) return <span className="badge badge-no">✕ Sin stock</span>;
+                    if(mant>0) return <span className="badge badge-mant">🔧 Parcial mant.</span>;
+                    return <span className="badge badge-ok">✓ Disponible</span>;
+                  })()}</td>
+                  <td>
+                    <div style={{display:"flex",gap:5,flexWrap:"nowrap"}}>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>setModal({type:"item",data:item})} title="Editar / mantenimiento" style={{minWidth:52}}>🔧 {mant}</button>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>setModal({type:"item",data:item})}>✏️</button>
+                      <button className="btn btn-danger btn-sm" onClick={()=>setModal({type:"delItem",data:item})}>🗑</button>
+                    </div>
+                  </td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+          {filtInv.length===0&&<div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>No se encontraron equipos</div>}
+        </div>
+      </div>}
+
+      {/* ===== EVENTOS ===== */}
+      {view==="eventos"&&<div>
+        <div className="sec-hdr">
+          <div>
+            <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700}}>Eventos</h2>
+            <p style={{color:"var(--text2)",fontSize:13,marginTop:2}}>Crea eventos y asigna equipos del inventario</p>
+          </div>
+          <button className="btn btn-primary" onClick={()=>setModal({type:"event",data:null})}>+ Nuevo Evento</button>
+        </div>
+        <div className="ev-grid">
+          {events.map(ev=>{
+            const eqs=getEvEqs(ev.id);
+            const totalVal=eqs.reduce((s,eq)=>{const it=inventory.find(i=>i.id===eq.inventario_id);return s+(it?it.precio*eq.cantidad:0);},0);
+            const past=isPast(ev);
+            return <div key={ev.id} className="card" style={{padding:18,borderLeft:`4px solid ${ev.color}`,opacity:past?.65:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                <div style={{minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <div style={{fontWeight:700,fontSize:15}}>{ev.nombre}</div>
+                    {past&&<span style={{fontSize:10,fontWeight:700,background:"var(--bg3)",color:"var(--text3)",padding:"1px 7px",borderRadius:20,border:"1px solid var(--border)"}}>FINALIZADO</span>}
+                  </div>
+                  <div style={{color:"var(--text2)",fontSize:13,marginTop:2}}>{ev.cliente}</div>
+                </div>
+                <div style={{display:"flex",gap:5,flexShrink:0}}>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>printEvent(ev)} title="Imprimir">🖨️</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setModal({type:"eeqs",data:ev})} title="Equipos">📦</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setModal({type:"event",data:ev})}>✏️</button>
+                  <button className="btn btn-danger btn-sm" onClick={()=>setModal({type:"delEvent",data:ev})}>🗑</button>
+                </div>
+              </div>
+              <div style={{marginTop:10,display:"flex",gap:14,fontSize:12,color:"var(--text2)",flexWrap:"wrap"}}>
+                <span>📅 {fmtD(ev.fecha)}{ev.fecha_fin&&ev.fecha_fin!==ev.fecha?` → ${fmtD(ev.fecha_fin)}`:""}</span>
+                <span>📍 {ev.lugar}</span>
+              </div>
+              <div className="sep"/>
+              <div style={{fontSize:13}}>
+                <div style={{color:"var(--text2)",marginBottom:6}}>Equipos ({eqs.length})</div>
+                {eqs.length===0&&<div style={{color:"var(--text3)",fontStyle:"italic"}}>Sin equipos asignados</div>}
+                {eqs.slice(0,3).map(eq=>{const it=inventory.find(i=>i.id===eq.inventario_id);return it?<div key={eq.id} style={{display:"flex",justifyContent:"space-between",marginBottom:3,color:"var(--text)"}}><span>{it.nombre}</span><span style={{color:"var(--accent)",fontWeight:600}}>x{eq.cantidad}</span></div>:null;})}
+                {eqs.length>3&&<div style={{color:"var(--text3)",fontSize:12}}>+{eqs.length-3} más...</div>}
+              </div>
+              <div className="sep"/>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:12,color:"var(--text2)"}}>Valor estimado</span>
+                <span style={{fontWeight:700,color:"var(--accent)"}}>{fmt(totalVal)}</span>
+              </div>
+            </div>;
+          })}
+          {events.length===0&&<div style={{color:"var(--text3)",padding:40}}>No hay eventos creados aún</div>}
+        </div>
+      </div>}
+
+      {/* ===== CALENDARIO ===== */}
+      {view==="calendario"&&<div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
+          <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700}}>Calendario</h2>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{let m=calMonth-1,y=calYear;if(m<0){m=11;y--;}setCalMonth(m);setCalYear(y);}}>‹</button>
+            <span style={{fontWeight:600,minWidth:130,textAlign:"center",fontSize:14}}>{MONTHS[calMonth]} {calYear}</span>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{let m=calMonth+1,y=calYear;if(m>11){m=0;y++;}setCalMonth(m);setCalYear(y);}}>›</button>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+          {events.map(ev=><div key={ev.id} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"var(--text2)"}}><div style={{width:9,height:9,borderRadius:2,background:ev.color,flexShrink:0}}/><span style={{whiteSpace:"nowrap"}}>{ev.nombre}</span></div>)}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:3}}>
+          {DAYS.map(d=><div key={d} style={{textAlign:"center",fontSize:11,fontWeight:600,color:"var(--text3)",padding:"4px 0"}}>{d}</div>)}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
+          {Array(getFD(calYear,calMonth)).fill(null).map((_,i)=><div key={`e${i}`} style={{border:"1px solid var(--border2)",borderRadius:5,minHeight:64,opacity:.2,background:"var(--cal-day)"}}/>)}
+          {Array(getDIM(calYear,calMonth)).fill(null).map((_,i)=>{
+            const day=i+1;const dayEvs=getEvDay(day);
+            const td=new Date();const isToday=td.getFullYear()===calYear&&td.getMonth()===calMonth&&td.getDate()===day;
+            return <div key={day} className={`cal-day ${isToday?"today":""} ${dayEvs.length>0?"has-ev":""}`}>
+              <div style={{fontSize:11,fontWeight:isToday?700:400,color:isToday?"#7c3aed":"var(--text2)",marginBottom:2}}>{day}</div>
+              {dayEvs.map(ev=><div key={ev.id} className="cal-pill" style={{background:ev.color+"33",color:ev.color,border:`1px solid ${ev.color}55`}} title={ev.nombre}>{ev.nombre}</div>)}
+              {dayEvs.length>1&&<div style={{fontSize:9,color:"#7c3aed",fontWeight:700}}>⚡ x{dayEvs.length}</div>}
+            </div>;
+          })}
+        </div>
+      </div>}
+
+      {/* ===== UBICACIÓN ===== */}
+      {view==="ubicacion"&&<div>
+        <div style={{marginBottom:16}}>
+          <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700}}>Ubicación de Equipos</h2>
+          <p style={{color:"var(--text2)",fontSize:13,marginTop:2}}>Dónde está cada equipo del inventario</p>
+        </div>
+        <div className="ubic-grid">
+          {inventory.map(item=>{
+            const evWithItem=getEqEvs(item.id);const used=getUsed(item.id);const mant=item.cantidad_mantenimiento||0;const avail=item.cantidad-(used+mant);
+            return <div key={item.id} className="card" style={{padding:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:14}}>{item.nombre}</div>
+                  <div style={{fontSize:12,color:"var(--text2)",marginTop:1}}>{item.descripcion}</div>
+                  {item.fecha_adquisicion&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>📅 Adq: {fmtD(item.fecha_adquisicion)}</div>}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end"}}>
+                  {(item.cantidad_mantenimiento||0)>0&&<span className="badge badge-mant">🔧 {item.cantidad_mantenimiento}</span>}
+                  <EstatusBadge estatus={item.estatus}/>
+                </div>
+              </div>
+              <div style={{marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"var(--text2)",marginBottom:5,flexWrap:"wrap",gap:6}}>
+                  <span>📦 <strong>{item.cantidad}</strong></span>
+                  {mant>0&&<span style={{color:"#f59e0b"}}>🔧 <strong>{mant}</strong></span>}
+                  <span style={{color:"#7c3aed"}}>🎪 <strong>{used}</strong></span>
+                  <span style={{color:avail<=0?"#f87171":"#16a34a"}}>✓ <strong>{Math.max(0,avail)}</strong></span>
+                </div>
+                <div style={{height:7,background:"var(--border2)",borderRadius:4,overflow:"hidden",display:"flex"}}>
+                  <div style={{height:"100%",width:`${item.cantidad?(used/item.cantidad)*100:0}%`,background:"#7c3aed",transition:"width .3s"}}/>
+                  <div style={{height:"100%",width:`${item.cantidad?(mant/item.cantidad)*100:0}%`,background:"#f59e0b",transition:"width .3s"}}/>
+                </div>
+              </div>
+              {evWithItem.length===0?<div style={{fontSize:13,color:"var(--text3)",fontStyle:"italic"}}>No asignado a ningún evento</div>
+              :evWithItem.map(ev=>{
+                const eq=eeqs.find(e=>e.evento_id===ev.id&&e.inventario_id===item.id);
+                return <div key={ev.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 9px",borderRadius:6,background:ev.color+"15",border:`1px solid ${ev.color}33`,marginBottom:3}}>
+                  <div><div style={{fontSize:12,color:ev.color,fontWeight:600}}>{ev.nombre}</div><div style={{fontSize:11,color:"var(--text2)"}}>{fmtD(ev.fecha)} · {ev.lugar}</div></div>
+                  <span style={{fontWeight:700,color:ev.color,flexShrink:0}}>x{eq?.cantidad}</span>
+                </div>;
+              })}
+            </div>;
+          })}
+        </div>
+      </div>}
+    </div>
+
+    {modal&&<div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+      {modal.type==="item"&&<ItemModal item={modal.data} onSave={saveItem} onClose={()=>setModal(null)} saving={saving}/>}
+      {modal.type==="delItem"&&<ConfirmModal title="¿Eliminar equipo?" msg={`Se eliminará "${modal.data.nombre}". Esta acción no se puede deshacer.`} onConfirm={()=>deleteItem(modal.data.id)} onClose={()=>setModal(null)} saving={saving}/>}
+      {modal.type==="event"&&<EventModal event={modal.data} onSave={saveEvent} onClose={()=>setModal(null)} saving={saving}/>}
+      {modal.type==="delEvent"&&<ConfirmModal title="¿Eliminar evento?" msg={`Se eliminará "${modal.data.nombre}" y sus equipos asignados.`} onConfirm={()=>deleteEvent(modal.data.id)} onClose={()=>setModal(null)} saving={saving}/>}
+      {modal.type==="eeqs"&&<EeqsModal event={modal.data} inventory={inventory} eeqs={eeqs} getAvail={getAvail} onSave={saveEeqs} onClose={()=>setModal(null)} saving={saving}/>}
+    </div>}
+  </div>;
+}
+
+function ConfirmModal({title,msg,onConfirm,onClose,saving}){
+  return <div className="modal" style={{maxWidth:380}}>
+    <h3 style={{fontFamily:"'Space Grotesk',sans-serif",marginBottom:10}}>{title}</h3>
+    <p style={{color:"var(--text2)",marginBottom:20,fontSize:14,lineHeight:1.5}}>{msg}</p>
+    <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+      <button className="btn btn-danger" disabled={saving} onClick={onConfirm}>{saving?"Eliminando...":"Eliminar"}</button>
+    </div>
+  </div>;
+}
+
+function ItemModal({item,onSave,onClose,saving}){
+  const [f,setF]=useState(item
+    ?{...item,precio:String(item.precio||0),cantidad:String(item.cantidad||0),valor:String(item.valor||0),cantidad_mantenimiento:String(item.cantidad_mantenimiento||0),fecha_adquisicion:item.fecha_adquisicion||"",estatus:item.estatus||"activo"}
+    :{nombre:"",descripcion:"",dueno:"",precio:"",cantidad:"",valor:"",cantidad_mantenimiento:"0",estado:"disponible",fecha_adquisicion:"",estatus:"activo"}
+  );
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const cantTotal=parseFloat(f.cantidad)||0;
+  const cantMant=Math.min(parseFloat(f.cantidad_mantenimiento)||0,cantTotal);
+  const cantDisp=Math.max(0,cantTotal-cantMant);
+
+  const handleSave=()=>{
+    const data={
+      nombre:f.nombre,descripcion:f.descripcion,dueno:f.dueno||null,estado:f.estado,
+      precio:parseFloat(f.precio)||0,
+      cantidad:parseFloat(f.cantidad)||0,
+      valor:parseFloat(f.valor)||0,
+      cantidad_mantenimiento:Math.min(parseFloat(f.cantidad_mantenimiento)||0,parseFloat(f.cantidad)||0),
+      fecha_adquisicion:f.fecha_adquisicion||null,
+      estatus:f.estatus||"activo"
+    };
+    if(item?.id) data.id=item.id;
+    if(item?.created_at) data.created_at=item.created_at;
+    onSave(data);
+  };
+
+  return <div className="modal">
+    <h3 style={{fontFamily:"'Space Grotesk',sans-serif",marginBottom:18}}>{item?.id?"Editar Equipo":"Nuevo Equipo"}</h3>
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div><label className="label">Nombre *</label><input className="input" value={f.nombre} onChange={e=>s("nombre",e.target.value)} placeholder="Ej: Módulos de Pantalla LED"/></div>
+      <div><label className="label">Dueño</label><input className="input" value={f.dueno||""} onChange={e=>s("dueno",e.target.value)} placeholder="Nombre del dueño (opcional)"/></div>
+      <div><label className="label">Descripción</label><textarea className="input" rows={2} value={f.descripcion||""} onChange={e=>s("descripcion",e.target.value)} placeholder="Descripción técnica" style={{resize:"vertical"}}/></div>
+      <div className="row2">
+        <div><label className="label">Precio unitario ($)</label><input className="input" type="number" inputMode="decimal" value={f.precio} onChange={e=>s("precio",e.target.value)} placeholder="0.00"/></div>
+        <div><label className="label">Valor comercial ($)</label><input className="input" type="number" inputMode="decimal" value={f.valor} onChange={e=>s("valor",e.target.value)} placeholder="0.00"/></div>
+      </div>
+      <div className="row2">
+        <div>
+          <label className="label">Cantidad total en bodega</label>
+          <input className="input" type="number" inputMode="numeric" value={f.cantidad} onChange={e=>s("cantidad",e.target.value)} placeholder="0" min="0"/>
+        </div>
+        <div>
+          <label className="label" style={{color:"#f59e0b"}}>🔧 En mantenimiento</label>
+          <input className="input" type="number" inputMode="numeric" value={f.cantidad_mantenimiento} onChange={e=>s("cantidad_mantenimiento",e.target.value)} placeholder="0" min="0" max={cantTotal} style={{borderColor:(parseFloat(f.cantidad_mantenimiento)||0)>0?"#f59e0b":undefined}}/>
+        </div>
+      </div>
+
+      {/* NUEVOS CAMPOS */}
+      <div className="row2">
+        <div>
+          <label className="label">📅 Fecha de adquisición</label>
+          <input className="input" type="date" value={f.fecha_adquisicion||""} onChange={e=>s("fecha_adquisicion",e.target.value)}/>
+        </div>
+        <div>
+          <label className="label">Estatus del equipo</label>
+          <select className="input" value={f.estatus||"activo"} onChange={e=>s("estatus",e.target.value)}>
+            <option value="activo">✓ Activo</option>
+            <option value="inactivo">⏸ Inactivo</option>
+            <option value="baja">✕ Baja</option>
+          </select>
+        </div>
+      </div>
+
+      {cantTotal>0&&<div style={{background:"var(--bg3)",border:"1px solid var(--border)",borderRadius:8,padding:"12px 14px"}}>
+        <div style={{fontSize:11,color:"var(--text2)",marginBottom:8,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em"}}>Resumen</div>
+        <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13,marginBottom:10}}>
+          <span>📦 Total: <strong>{cantTotal}</strong></span>
+          <span style={{color:"#f59e0b"}}>🔧 Mant.: <strong>{cantMant}</strong></span>
+          <span style={{color:cantDisp===0?"#f87171":"#16a34a"}}>✓ Disponibles: <strong>{cantDisp}</strong></span>
+        </div>
+        <div style={{height:8,background:"var(--border)",borderRadius:4,overflow:"hidden",display:"flex"}}>
+          <div style={{height:"100%",width:`${cantTotal?(cantDisp/cantTotal)*100:0}%`,background:"#16a34a",transition:"width .3s"}}/>
+          <div style={{height:"100%",width:`${cantTotal?(cantMant/cantTotal)*100:0}%`,background:"#f59e0b",transition:"width .3s"}}/>
+        </div>
+      </div>}
+
+      <div><label className="label">Estado del equipo</label>
+        <select className="input" value={f.estado} onChange={e=>s("estado",e.target.value)}>
+          <option value="disponible">Activo</option>
+          <option value="mantenimiento">Dado de baja</option>
+        </select>
+      </div>
+    </div>
+    <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
+      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+      <button className="btn btn-primary" disabled={saving||!f.nombre} onClick={handleSave}>{saving?"Guardando...":"Guardar"}</button>
+    </div>
+  </div>;
+}
+
+const COLORS=["#e74c3c","#e67e22","#f1c40f","#2ecc71","#1abc9c","#3498db","#9b59b6","#e91e63"];
+
+function EventModal({event,onSave,onClose,saving}){
+  const [f,setF]=useState(event||{nombre:"",cliente:"",fecha:"",fecha_fin:"",lugar:"",color:"#3498db"});
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  return <div className="modal">
+    <h3 style={{fontFamily:"'Space Grotesk',sans-serif",marginBottom:18}}>{event?.id?"Editar Evento":"Nuevo Evento"}</h3>
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div><label className="label">Nombre del evento *</label><input className="input" value={f.nombre} onChange={e=>s("nombre",e.target.value)} placeholder="Nombre del evento"/></div>
+      <div className="row2">
+        <div><label className="label">Cliente</label><input className="input" value={f.cliente||""} onChange={e=>s("cliente",e.target.value)} placeholder="Nombre del cliente"/></div>
+        <div><label className="label">Lugar</label><input className="input" value={f.lugar||""} onChange={e=>s("lugar",e.target.value)} placeholder="Ubicación"/></div>
+      </div>
+      <div className="row2">
+        <div><label className="label">Fecha inicio *</label><input className="input" type="date" value={f.fecha} onChange={e=>s("fecha",e.target.value)}/></div>
+        <div><label className="label">Fecha fin</label><input className="input" type="date" value={f.fecha_fin||""} onChange={e=>s("fecha_fin",e.target.value)}/></div>
+      </div>
+      <div><label className="label">Color del evento</label>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {COLORS.map(c=><button key={c} onClick={()=>s("color",c)} style={{width:30,height:30,borderRadius:"50%",background:c,border:f.color===c?"3px solid var(--text)":"3px solid transparent",cursor:"pointer",flexShrink:0}}/>)}
+        </div>
+      </div>
+    </div>
+    <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
+      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+      <button className="btn btn-primary" disabled={saving||!f.nombre||!f.fecha} onClick={()=>onSave({...f,fecha_fin:f.fecha_fin||f.fecha})}>{saving?"Guardando...":"Guardar"}</button>
+    </div>
+  </div>;
+}
+
+function EeqsModal({event,inventory,eeqs,getAvail,onSave,onClose,saving}){
+  const cur=eeqs.filter(e=>e.evento_id===event.id);
+  const [equipos,setEquipos]=useState(cur.map(e=>({inventario_id:e.inventario_id,cantidad:e.cantidad})));
+  const [filtro,setFiltro]=useState("");
+
+  const getMax=iid=>getAvail(iid,event.id);
+  const add=id=>{
+    if(!id||equipos.find(e=>e.inventario_id===id)) return;
+    if(getMax(id)<=0) return;
+    setEquipos(p=>[...p,{inventario_id:id,cantidad:1}]);
+    setFiltro("");
+  };
+  const updCant=(id,val)=>{
+    const max=getMax(id);
+    const q=Math.max(1,Math.min(val,max));
+    setEquipos(p=>p.map(e=>e.inventario_id===id?{...e,cantidad:q}:e));
+  };
+  const rem=id=>setEquipos(p=>p.filter(e=>e.inventario_id!==id));
+
+  const toAdd=inventory.filter(it=>!equipos.find(e=>e.inventario_id===it.id)&&getMax(it.id)>0);
+  const toAddF=toAdd.filter(it=>it.nombre.toLowerCase().includes(filtro.toLowerCase())||(it.descripcion||"").toLowerCase().includes(filtro.toLowerCase()));
+  const sinStock=inventory.filter(it=>!equipos.find(e=>e.inventario_id===it.id)&&getMax(it.id)===0);
+
+  return <div className="modal">
+    <h3 style={{fontFamily:"'Space Grotesk',sans-serif",marginBottom:4}}>Equipos del evento</h3>
+    <p style={{color:"var(--text2)",fontSize:13,marginBottom:16}}>{event.nombre}</p>
+    {equipos.length===0&&<div style={{color:"var(--text3)",fontSize:13,marginBottom:12,fontStyle:"italic"}}>Sin equipos asignados</div>}
+    {equipos.map(eq=>{
+      const item=inventory.find(i=>i.id===eq.inventario_id);if(!item)return null;
+      const maxA=getMax(item.id);
+      const isOver=eq.cantidad>maxA;
+      return <div key={eq.inventario_id} style={{display:"flex",gap:10,alignItems:"center",marginBottom:8,padding:"10px 12px",background:"var(--item-bg)",borderRadius:8,border:`1px solid ${isOver?"#ef4444":"var(--item-border)"}`}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.nombre}</div>
+          <div style={{fontSize:11,color:isOver?"#f87171":"var(--text2)"}}>
+            {isOver?`⚠ Solo hay ${maxA} disponibles`:`Disponible: ${maxA} de ${item.cantidad}`}
+          </div>
+        </div>
+        <NumInput value={eq.cantidad} onChange={v=>updCant(eq.inventario_id,v)} min={1} max={maxA} className="input input-num"/>
+        <button className="btn btn-danger btn-sm" onClick={()=>rem(eq.inventario_id)} style={{flexShrink:0}}>✕</button>
+      </div>;
+    })}
+    <div className="sep"/>
+    <label className="label">Agregar equipo</label>
+    <input className="input" style={{marginBottom:8}} placeholder="🔎 Buscar equipo disponible..." value={filtro} onChange={e=>setFiltro(e.target.value)}/>
+    {filtro&&<div style={{background:"var(--sr-bg)",border:"1px solid var(--border)",borderRadius:8,overflow:"hidden",marginBottom:8,maxHeight:200,overflowY:"auto",boxShadow:"0 4px 16px #0000001a"}}>
+      {toAddF.length===0&&<div style={{padding:"10px 14px",fontSize:13,color:"var(--text3)"}}>Sin resultados</div>}
+      {toAddF.map(it=>(
+        <div key={it.id} onClick={()=>add(it.id)}
+          style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid var(--border2)",display:"flex",justifyContent:"space-between",alignItems:"center"}}
+          onMouseEnter={e=>e.currentTarget.style.background="var(--sr-hover)"}
+          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+          <div style={{minWidth:0,flex:1}}>
+            <div style={{fontSize:13,fontWeight:600,color:"var(--sr-text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.nombre}</div>
+            <div style={{fontSize:11,color:"var(--text2)"}}>{it.descripcion}</div>
+          </div>
+          <span style={{fontSize:12,color:"#16a34a",fontWeight:700,whiteSpace:"nowrap",marginLeft:10}}>+{getMax(it.id)} disp.</span>
+        </div>
+      ))}
+    </div>}
+    {!filtro&&toAdd.length>0&&<select className="input" onChange={e=>{add(e.target.value);e.target.value="";}} defaultValue="" style={{marginBottom:4}}>
+      <option value="" disabled>— o selecciona de la lista —</option>
+      {toAdd.map(it=><option key={it.id} value={it.id}>{it.nombre} — disponible: {getMax(it.id)}</option>)}
+    </select>}
+    {toAdd.length===0&&sinStock.length===0&&<div style={{fontSize:13,color:"var(--text3)",fontStyle:"italic"}}>Todos los equipos ya están asignados</div>}
+    {sinStock.length>0&&<div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>🔒 Sin stock: {sinStock.map(it=>it.nombre).join(", ")}</div>}
+    <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
+      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+      <button className="btn btn-primary" disabled={saving||equipos.some(eq=>eq.cantidad>getMax(eq.inventario_id))} onClick={()=>onSave(event.id,equipos)}>{saving?"Guardando...":"Guardar equipos"}</button>
+    </div>
+  </div>;
+}
+
+createRoot(document.getElementById("root")).render(<App/>);
+})();
+</script>
+</body>
+</html>

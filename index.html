@@ -56,6 +56,7 @@ input[type=number]::-webkit-outer-spin-button{opacity:1;height:36px;cursor:point
 .btn-primary{background:#6d28d9;color:#fff}.btn-primary:hover{background:#7c3aed}
 .btn-danger{background:#dc2626;color:#fff}.btn-danger:hover{background:#b91c1c}
 .btn-ghost{background:var(--ghost-bg);color:var(--ghost-color);border:1px solid var(--ghost-border)}.btn-ghost:hover{background:var(--ghost-hover)}
+.btn-warning{background:#f59e0b;color:#fff;border:none}.btn-warning:hover{background:#d97706}
 .btn-sm{padding:6px 12px;font-size:12px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .nav-btn{background:none;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:all .2s;color:var(--nav-color);display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap}
@@ -114,6 +115,13 @@ tr:hover td{background:var(--td-hover)}
 @keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .modal{animation:slideup .25s ease}
 @media(min-width:640px){.modal{animation:none}}
+/* Mant icon pulse */
+@keyframes mantpulse{0%,100%{opacity:1}50%{opacity:.5}}
+.mant-icon{display:inline-flex;align-items:center;gap:3px;background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:2px 7px;font-size:11px;font-weight:700;color:#ca8a04;cursor:default}
+[data-theme="dark"] .mant-icon{background:#78350f44;border-color:#fbbf2433;color:#fbbf24}
+/* Total value banner */
+.total-banner{background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff;border-radius:12px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px;flex-wrap:wrap}
+[data-theme="dark"] .total-banner{background:linear-gradient(135deg,#3b1f7a,#4c1d95)}
 </style>
 </head>
 <body>
@@ -149,13 +157,23 @@ const api={
   setEeqs:async(evId,eqs)=>{
     await sb(`evento_equipos?evento_id=eq.${evId}`,{method:"DELETE",prefer:"return=minimal"});
     if(eqs.length>0) await sb("evento_equipos",{method:"POST",body:JSON.stringify(eqs.map(e=>({evento_id:evId,inventario_id:e.inventario_id,cantidad:e.cantidad})))});
-  }
+  },
+  registrarBaja:(d)=>sb("bajas_inventario",{method:"POST",body:JSON.stringify(d)}),
+  getBajas:()=>sb("bajas_inventario?order=fecha_baja.desc"),
+  archivarEvento:(d)=>sb("eventos_archivo",{method:"POST",body:JSON.stringify(d),prefer:"return=minimal"}),
+  getArchivoEventos:()=>sb("eventos_archivo?order=fecha.desc")
 };
 
 const MONTHS=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DAYS=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 const fmt=n=>new Intl.NumberFormat("es-EC",{style:"currency",currency:"USD",minimumFractionDigits:2}).format(n||0);
 const fmtD=d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;};
+const fmtDateTime=()=>{const now=new Date();return now.toLocaleString("es-EC",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});};
+
+/* ── historial de bajas en localStorage ── */
+const BAJA_KEY="eventtech_bajas_v1";
+const loadBajas=()=>{try{return JSON.parse(localStorage.getItem(BAJA_KEY)||"[]");}catch{return[];}};
+const saveBajas=arr=>localStorage.setItem(BAJA_KEY,JSON.stringify(arr));
 
 function NumInput({value,onChange,min=0,max,className="input",style={}}){
   const [local,setLocal]=useState(String(value??0));
@@ -201,6 +219,10 @@ function App(){
   const [saving,setSaving]=useState(false);
   const [toast,setToast]=useState(null);
   const [dark,setDark]=useState(()=>localStorage.getItem("theme")==="dark");
+  /* ── nuevos estados ── */
+  const [showDelete,setShowDelete]=useState(true);         // toggle botón borrar
+  const [bajas,setBajas]=useState([]);                      // historial de bajas (Supabase)
+  const [archivoEventos,setArchivoEventos]=useState([]);   // archivo de eventos pasados
 
   useEffect(()=>{
     document.documentElement.setAttribute("data-theme",dark?"dark":"light");
@@ -212,8 +234,9 @@ function App(){
   const loadAll=useCallback(async()=>{
     setLoading(true);
     try{
-      const [inv,evs,eq]=await Promise.all([api.getInventario(),api.getEventos(),api.getEeqs()]);
+      const [inv,evs,eq,bajasDB,archDB]=await Promise.all([api.getInventario(),api.getEventos(),api.getEeqs(),api.getBajas(),api.getArchivoEventos()]);
       setInventory(inv||[]);setEvents(evs||[]);setEeqs(eq||[]);
+      setBajas(bajasDB||[]);setArchivoEventos(archDB||[]);
     }catch(e){showToast("Error al cargar: "+e.message,"err");}
     setLoading(false);
   },[]);
@@ -224,17 +247,46 @@ function App(){
     setSaving(true);
     try{
       const{id,created_at,...data}=item;
-      if(id){await api.updateItem(id,data);showToast("Equipo actualizado");}
-      else{await api.createItem(data);showToast("Equipo creado");}
+      if(id){
+        const anterior=inventory.find(i=>i.id===id);
+        const diff=(anterior?.cantidad||0)-(data.cantidad||0);
+        // Si se redujo la cantidad, registrar baja parcial
+        if(diff>0){
+          await api.registrarBaja({
+            nombre:data.nombre||anterior?.nombre||"Desconocido",
+            descripcion:data.descripcion||anterior?.descripcion||"",
+            cantidad:diff,
+            precio:data.precio||anterior?.precio||0,
+            motivo:`Baja parcial por edición de inventario (cantidad reducida de ${anterior?.cantidad} a ${data.cantidad})`
+          });
+        }
+        await api.updateItem(id,data);
+        showToast(diff>0?`Equipo actualizado · ${diff} unidad${diff!==1?"es":""} registrada${diff!==1?"s":""} en bajas`:"Equipo actualizado");
+      }else{
+        await api.createItem(data);showToast("Equipo creado");
+      }
       await loadAll();setModal(null);
     }catch(e){showToast("Error: "+e.message,"err");}
     setSaving(false);
   };
 
-  const deleteItem=async(id)=>{
+  /* ── eliminar con registro de baja en Supabase ── */
+  const deleteItem=async(id,descripcionBaja)=>{
     setSaving(true);
-    try{await api.deleteItem(id);showToast("Equipo eliminado");await loadAll();setModal(null);}
-    catch(e){showToast("Error: "+e.message,"err");}
+    try{
+      const item=inventory.find(i=>i.id===id);
+      // Registrar baja en Supabase ANTES de eliminar
+      await api.registrarBaja({
+        nombre:item?.nombre||"Desconocido",
+        descripcion:item?.descripcion||"",
+        cantidad:item?.cantidad||0,
+        precio:item?.precio||item?.valor||0,
+        motivo:descripcionBaja||"Sin descripción"
+      });
+      await api.deleteItem(id);
+      showToast("Equipo dado de baja y registrado en historial");
+      await loadAll();setModal(null);
+    }catch(e){showToast("Error: "+e.message,"err");}
     setSaving(false);
   };
 
@@ -251,7 +303,26 @@ function App(){
 
   const deleteEvent=async(id)=>{
     setSaving(true);
-    try{await api.deleteEvento(id);showToast("Evento eliminado");await loadAll();setModal(null);}
+    try{
+      const ev=events.find(e=>e.id===id);
+      const eqsEvento=getEvEqs(id).map(eq=>{
+        const it=inventory.find(i=>i.id===eq.inventario_id);
+        return {nombre:it?.nombre||"?",cantidad:eq.cantidad};
+      });
+      // Archivar evento ANTES de eliminar
+      await api.archivarEvento({
+        id:ev.id,
+        nombre:ev.nombre,
+        cliente:ev.cliente||null,
+        lugar:ev.lugar||null,
+        color:ev.color||null,
+        fecha:ev.fecha,
+        fecha_fin:ev.fecha_fin||ev.fecha,
+        equipos:eqsEvento
+      });
+      await api.deleteEvento(id);
+      showToast("Evento eliminado y archivado");await loadAll();setModal(null);
+    }
     catch(e){showToast("Error: "+e.message,"err");}
     setSaving(false);
   };
@@ -265,6 +336,7 @@ function App(){
 
   const todayDate=new Date();todayDate.setHours(0,0,0,0);
   const isPast=ev=>{const fin=new Date(ev.fecha_fin||ev.fecha);fin.setHours(23,59,59,999);return fin<todayDate;};
+
   const activeEeqs=eeqs.filter(eq=>{const ev=events.find(e=>e.id===eq.evento_id);return ev&&!isPast(ev);});
 
   const getEvEqs=eid=>eeqs.filter(e=>e.evento_id===eid);
@@ -273,6 +345,46 @@ function App(){
   const getMant=iid=>{const it=inventory.find(i=>i.id===iid);return it?(it.cantidad_mantenimiento||0):0;};
   const getAvail=(iid,exEv=null)=>{const it=inventory.find(i=>i.id===iid);return it?Math.max(0,it.cantidad-getUsed(iid,exEv)-getMant(iid)):0;};
 
+  /* ── valor total en bodega ── */
+  const totalValorComercial=useMemo(()=>inventory.reduce((s,it)=>s+(it.valor||it.precio||0)*it.cantidad,0),[inventory]);
+
+  /* ── items en mantenimiento ── */
+  const itemsEnMant=useMemo(()=>inventory.filter(it=>(it.cantidad_mantenimiento||0)>0),[inventory]);
+
+  /* ── imprimir reporte de mantenimiento ── */
+  const printMantReport=()=>{
+    const rows=itemsEnMant.map(it=>`<tr>
+      <td>${it.nombre}</td>
+      <td>${it.descripcion||""}</td>
+      <td style="text-align:center">${it.cantidad}</td>
+      <td style="text-align:center;color:#d97706;font-weight:700">${it.cantidad_mantenimiento}</td>
+      <td style="text-align:center;color:#16a34a;font-weight:700">${Math.max(0,it.cantidad-(it.cantidad_mantenimiento||0))}</td>
+      <td>${it.dueno||"—"}</td>
+    </tr>`).join("");
+    const win=window.open("","_blank");
+    win.document.write(`<!DOCTYPE html><html><head><title>Reporte de Mantenimiento</title>
+    <style>body{font-family:'Segoe UI',sans-serif;padding:32px;color:#111;max-width:960px;margin:0 auto}
+    h1{font-size:22px;margin-bottom:4px}
+    .meta{color:#555;font-size:13px;margin-bottom:20px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#111;color:#fff;padding:10px 14px;text-align:left;font-size:12px;text-transform:uppercase}
+    td{padding:9px 14px;border-bottom:1px solid #eee;font-size:13px}
+    tr:nth-child(even) td{background:#fffbf0}
+    .noprint{margin-bottom:16px}
+    @media print{.noprint{display:none}}
+    </style></head><body>
+    <button class="noprint" onclick="window.print()" style="padding:8px 18px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;margin-bottom:16px">🖨 Imprimir</button>
+    <h1>🔧 Reporte de Elementos en Mantenimiento</h1>
+    <div class="meta">Generado el ${fmtDateTime()} · Total de equipos en mantenimiento: <strong>${itemsEnMant.length}</strong></div>
+    <table><thead><tr>
+      <th>Equipo</th><th>Descripción</th><th style="text-align:center">Total</th>
+      <th style="text-align:center">🔧 Mant.</th><th style="text-align:center">✓ Libre</th><th>Dueño</th>
+    </tr></thead><tbody>
+    ${rows||"<tr><td colspan='6' style='text-align:center;color:#aaa;padding:20px'>Sin equipos en mantenimiento</td></tr>"}
+    </tbody></table></body></html>`);
+    win.document.close();
+  };
+
   const getDIM=(y,m)=>new Date(y,m+1,0).getDate();
   const getFD=(y,m)=>new Date(y,m,1).getDay();
   const getEvDay=day=>{
@@ -280,11 +392,43 @@ function App(){
     return events.filter(ev=>d>=ev.fecha&&d<=(ev.fecha_fin||ev.fecha));
   };
 
+  /* ── imprimir evento con columna Regreso ── */
   const printEvent=ev=>{
     const eqs=getEvEqs(ev.id);
-    const rows=eqs.map(eq=>{const it=inventory.find(i=>i.id===eq.inventario_id);return it?`<tr><td>${it.nombre}</td><td>${it.descripcion||""}</td><td style="text-align:center">${eq.cantidad}</td><td style="text-align:center"><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td></tr>`:""}).join("");
+    const rows=eqs.map(eq=>{
+      const it=inventory.find(i=>i.id===eq.inventario_id);
+      return it?`<tr>
+        <td>${it.nombre}</td>
+        <td>${it.descripcion||""}</td>
+        <td style="text-align:center">${eq.cantidad}</td>
+        <td style="text-align:center"><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td>
+        <td style="text-align:center"><input type="checkbox" style="width:16px;height:16px;cursor:pointer"/></td>
+      </tr>`:"";
+    }).join("");
     const win=window.open("","_blank");
-    win.document.write(`<!DOCTYPE html><html><head><title>${ev.nombre}</title><style>body{font-family:'Segoe UI',sans-serif;padding:32px;color:#111;max-width:900px;margin:0 auto}h1{font-size:24px;margin-bottom:4px}.meta{color:#555;margin-bottom:20px;font-size:13px;line-height:2}table{width:100%;border-collapse:collapse}th{background:#111;color:#fff;padding:10px 14px;text-align:left;font-size:12px;text-transform:uppercase}td{padding:9px 14px;border-bottom:1px solid #eee;font-size:13px}tr:nth-child(even) td{background:#f9f9ff}.dot{display:inline-block;width:10px;height:10px;border-radius:2px;background:${ev.color};margin-right:6px;vertical-align:middle}@media print{.noprint{display:none}}</style></head><body><button class="noprint" onclick="window.print()" style="margin-bottom:16px;padding:8px 18px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨 Imprimir</button><h1><span class="dot"></span>${ev.nombre}</h1><div class="meta"><b>Cliente:</b> ${ev.cliente||"—"}<br><b>Lugar:</b> ${ev.lugar||"—"}<br><b>Fecha:</b> ${fmtD(ev.fecha)}${ev.fecha_fin&&ev.fecha_fin!==ev.fecha?` al ${fmtD(ev.fecha_fin)}`:""}</div><table><thead><tr><th>Equipo</th><th>Descripción</th><th style="text-align:center">Cant.</th><th style="text-align:center">✓ Salida</th></tr></thead><tbody>${rows||"<tr><td colspan='4' style='text-align:center;color:#aaa;padding:20px'>Sin equipos asignados</td></tr>"}</tbody></table></body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head><title>${ev.nombre}</title>
+    <style>body{font-family:'Segoe UI',sans-serif;padding:32px;color:#111;max-width:900px;margin:0 auto}
+    h1{font-size:24px;margin-bottom:4px}
+    .meta{color:#555;margin-bottom:20px;font-size:13px;line-height:2}
+    table{width:100%;border-collapse:collapse}
+    th{background:#111;color:#fff;padding:10px 14px;text-align:left;font-size:12px;text-transform:uppercase}
+    td{padding:9px 14px;border-bottom:1px solid #eee;font-size:13px}
+    tr:nth-child(even) td{background:#f9f9ff}
+    .dot{display:inline-block;width:10px;height:10px;border-radius:2px;background:${ev.color};margin-right:6px;vertical-align:middle}
+    @media print{.noprint{display:none}}
+    </style></head><body>
+    <button class="noprint" onclick="window.print()" style="margin-bottom:16px;padding:8px 18px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨 Imprimir</button>
+    <h1><span class="dot"></span>${ev.nombre}</h1>
+    <div class="meta"><b>Cliente:</b> ${ev.cliente||"—"}<br><b>Lugar:</b> ${ev.lugar||"—"}<br>
+    <b>Fecha:</b> ${fmtD(ev.fecha)}${ev.fecha_fin&&ev.fecha_fin!==ev.fecha?` al ${fmtD(ev.fecha_fin)}`:""}</div>
+    <table><thead><tr>
+      <th>Equipo</th><th>Descripción</th>
+      <th style="text-align:center">Cant.</th>
+      <th style="text-align:center">✓ Salida</th>
+      <th style="text-align:center">↩ Regreso</th>
+    </tr></thead>
+    <tbody>${rows||"<tr><td colspan='5' style='text-align:center;color:#aaa;padding:20px'>Sin equipos asignados</td></tr>"}</tbody>
+    </table></body></html>`);
     win.document.close();
   };
 
@@ -312,7 +456,14 @@ function App(){
     <div className="header">
       <div className="header-title">⚡ Inventario Evano</div>
       <div className="nav-wrap">
-        {[{id:"inventario",icon:"📦",label:"Inventario"},{id:"eventos",icon:"🎪",label:"Eventos"},{id:"calendario",icon:"📅",label:"Calendario"},{id:"ubicacion",icon:"🔍",label:"Ubicación"}].map(v=>(
+        {[
+          {id:"inventario",icon:"📦",label:"Inventario"},
+          {id:"eventos",icon:"🎪",label:"Eventos"},
+          {id:"calendario",icon:"📅",label:"Calendario"},
+          {id:"ubicacion",icon:"🔍",label:"Ubicación"},
+          {id:"bajas",icon:"🗂️",label:"Historial Bajas"},
+          {id:"archivo",icon:"📁",label:"Archivo Eventos"}
+        ].map(v=>(
           <button key={v.id} className={`nav-btn ${view===v.id?"active":""}`} onClick={()=>setView(v.id)}>{v.icon} {v.label}</button>
         ))}
       </div>
@@ -329,8 +480,45 @@ function App(){
             <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700}}>Inventario General</h2>
             <p style={{color:"var(--text2)",fontSize:13,marginTop:2}}>{inventory.length} equipos registrados</p>
           </div>
-          <button className="btn btn-primary" onClick={()=>setModal({type:"item",data:null})}>+ Nuevo Equipo</button>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+            {/* Botón toggle icono borrar */}
+            <button
+              className={`btn btn-sm ${showDelete?"btn-warning":"btn-ghost"}`}
+              onClick={()=>setShowDelete(d=>!d)}
+              title={showDelete?"Ocultar botones eliminar":"Mostrar botones eliminar"}
+            >
+              {showDelete?"🔒 Ocultar borrar":"🔓 Mostrar borrar"}
+            </button>
+            <button className="btn btn-primary" onClick={()=>setModal({type:"item",data:null})}>+ Nuevo Equipo</button>
+          </div>
         </div>
+
+        {/* Banner valor total comercial */}
+        <div className="total-banner">
+          <div>
+            <div style={{fontSize:12,opacity:.8,marginBottom:2,fontWeight:600,letterSpacing:".05em",textTransform:"uppercase"}}>Valor total comercial en bodega</div>
+            <div style={{fontSize:26,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif"}}>{fmt(totalValorComercial)}</div>
+          </div>
+          <div style={{fontSize:32,opacity:.7}}>💰</div>
+        </div>
+
+        {/* Banner mantenimiento si hay items */}
+        {itemsEnMant.length>0&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:12,padding:"12px 18px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <span style={{fontSize:22}}>🔧</span>
+            <div>
+              <div style={{fontWeight:700,color:"#92400e",fontSize:14}}>{itemsEnMant.length} equipo{itemsEnMant.length!==1?"s":""} en mantenimiento</div>
+              <div style={{fontSize:12,color:"#b45309",marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
+                {itemsEnMant.map(it=>(
+                  <span key={it.id} className="mant-icon">🔧 {it.nombre} ({it.cantidad_mantenimiento})</span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <button className="btn btn-sm" style={{background:"#f59e0b",color:"#fff",border:"none",flexShrink:0}} onClick={printMantReport}>
+            🖨️ Imprimir reporte mant.
+          </button>
+        </div>}
 
         <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
           <input className="input" style={{flex:"1 1 200px"}} placeholder="🔎 Buscar equipo..." value={search} onChange={e=>setSearch(e.target.value)}/>
@@ -369,7 +557,11 @@ function App(){
                 const inEvs=getEqEvs(item.id);
                 return <tr key={item.id}>
                   <td>
-                    <div style={{fontWeight:600}}>{item.nombre}</div>
+                    <div style={{fontWeight:600,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      {item.nombre}
+                      {/* Icono mantenimiento en línea */}
+                      {mant>0&&<span className="mant-icon" title={`${mant} unidad(es) en mantenimiento`}>🔧 {mant}</span>}
+                    </div>
                     {inEvs.length>0&&<div style={{marginTop:3}}>{inEvs.map(ev=><span key={ev.id} className="tag" style={{background:ev.color+"22",color:ev.color,border:`1px solid ${ev.color}44`}}>{ev.nombre}</span>)}</div>}
                   </td>
                   <td style={{color:"var(--text2)",maxWidth:160}}>{item.descripcion}{item.dueno&&<div style={{fontSize:11,color:"var(--accent)",marginTop:2}}>👤 {item.dueno}</div>}</td>
@@ -389,7 +581,7 @@ function App(){
                     <div style={{display:"flex",gap:5,flexWrap:"nowrap"}}>
                       <button className="btn btn-ghost btn-sm" onClick={()=>setModal({type:"item",data:item})} title="Editar / mantenimiento" style={{minWidth:52}}>🔧 {mant}</button>
                       <button className="btn btn-ghost btn-sm" onClick={()=>setModal({type:"item",data:item})}>✏️</button>
-                      <button className="btn btn-danger btn-sm" onClick={()=>setModal({type:"delItem",data:item})}>🗑</button>
+                      {showDelete&&<button className="btn btn-danger btn-sm" onClick={()=>setModal({type:"delItem",data:item})}>🗑</button>}
                     </div>
                   </td>
                 </tr>;
@@ -494,12 +686,14 @@ function App(){
             return <div key={item.id} className="card" style={{padding:16}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                 <div>
-                  <div style={{fontWeight:700,fontSize:14}}>{item.nombre}</div>
+                  <div style={{fontWeight:700,fontSize:14,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    {item.nombre}
+                    {mant>0&&<span className="mant-icon">🔧 {mant}</span>}
+                  </div>
                   <div style={{fontSize:12,color:"var(--text2)",marginTop:1}}>{item.descripcion}</div>
                   {item.fecha_adquisicion&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>📅 Adq: {fmtD(item.fecha_adquisicion)}</div>}
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end"}}>
-                  {(item.cantidad_mantenimiento||0)>0&&<span className="badge badge-mant">🔧 {item.cantidad_mantenimiento}</span>}
                   <EstatusBadge estatus={item.estatus}/>
                 </div>
               </div>
@@ -511,6 +705,7 @@ function App(){
                   <span style={{color:avail<=0?"#f87171":"#16a34a"}}>✓ <strong>{Math.max(0,avail)}</strong></span>
                 </div>
                 <div style={{height:7,background:"var(--border2)",borderRadius:4,overflow:"hidden",display:"flex"}}>
+                  <div style={{height:"100%",width:`${item.cantidad?(Math.max(0,avail)/item.cantidad)*100:0}%`,background:"#16a34a",transition:"width .3s"}}/>
                   <div style={{height:"100%",width:`${item.cantidad?(used/item.cantidad)*100:0}%`,background:"#7c3aed",transition:"width .3s"}}/>
                   <div style={{height:"100%",width:`${item.cantidad?(mant/item.cantidad)*100:0}%`,background:"#f59e0b",transition:"width .3s"}}/>
                 </div>
@@ -527,11 +722,95 @@ function App(){
           })}
         </div>
       </div>}
+
+      {/* ===== HISTORIAL DE BAJAS ===== */}
+      {view==="bajas"&&<div>
+        <div className="sec-hdr">
+          <div>
+            <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700}}>🗂️ Historial de Bajas</h2>
+            <p style={{color:"var(--text2)",fontSize:13,marginTop:2}}>{bajas.length} equipo{bajas.length!==1?"s":""} dado{bajas.length!==1?"s":""} de baja · guardado en Supabase</p>
+          </div>
+        </div>
+        {bajas.length===0&&<div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>
+          <div style={{fontSize:36,marginBottom:12}}>📋</div>
+          <div style={{fontSize:15,fontWeight:600,marginBottom:4}}>Sin registros de bajas</div>
+          <div style={{fontSize:13}}>Cuando des de baja un equipo del inventario, quedará registrado aquí permanentemente.</div>
+        </div>}
+        {bajas.length>0&&<div className="card table-wrap">
+          <table>
+            <thead><tr>
+              <th>Fecha de baja</th>
+              <th>Equipo</th>
+              <th>Descripción</th>
+              <th style={{textAlign:"center"}}>Cantidad</th>
+              <th>Precio unit.</th>
+              <th>Motivo / Descripción</th>
+            </tr></thead>
+            <tbody>
+              {bajas.map(b=>(
+                <tr key={b.id}>
+                  <td style={{whiteSpace:"nowrap",fontSize:12,color:"var(--text2)"}}>{b.fecha_baja?new Date(b.fecha_baja).toLocaleString("es-EC"):b.fecha||"—"}</td>
+                  <td style={{fontWeight:600}}>{b.nombre}</td>
+                  <td style={{color:"var(--text2)",maxWidth:180}}>{b.descripcion||"—"}</td>
+                  <td style={{textAlign:"center",fontWeight:700}}>{b.cantidad}</td>
+                  <td style={{color:"var(--accent)",fontWeight:600,whiteSpace:"nowrap"}}>{fmt(b.precio)}</td>
+                  <td style={{color:"var(--text2)",maxWidth:220}}>{b.motivo}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>}
+      </div>}
+
+      {/* ===== ARCHIVO DE EVENTOS ===== */}
+      {view==="archivo"&&<div>
+        <div className="sec-hdr">
+          <div>
+            <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700}}>📁 Archivo de Eventos</h2>
+            <p style={{color:"var(--text2)",fontSize:13,marginTop:2}}>{archivoEventos.length} evento{archivoEventos.length!==1?"s":""} archivado{archivoEventos.length!==1?"s":""} · guardado en Supabase</p>
+          </div>
+        </div>
+        {archivoEventos.length===0&&<div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>
+          <div style={{fontSize:36,marginBottom:12}}>📁</div>
+          <div style={{fontSize:15,fontWeight:600,marginBottom:4}}>Sin eventos archivados</div>
+          <div style={{fontSize:13}}>Cuando elimines un evento, quedará archivado aquí con todos sus equipos.</div>
+        </div>}
+        {archivoEventos.length>0&&<div className="ev-grid">
+          {archivoEventos.map(ev=>(
+            <div key={ev.id} className="card" style={{padding:18,borderLeft:`4px solid ${ev.color||"#999"}`,opacity:.85}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                <div style={{minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <div style={{fontWeight:700,fontSize:15}}>{ev.nombre}</div>
+                    <span style={{fontSize:10,fontWeight:700,background:"var(--bg3)",color:"var(--text3)",padding:"1px 7px",borderRadius:20,border:"1px solid var(--border)"}}>ARCHIVADO</span>
+                  </div>
+                  <div style={{color:"var(--text2)",fontSize:13,marginTop:2}}>{ev.cliente||"—"}</div>
+                </div>
+              </div>
+              <div style={{marginTop:10,display:"flex",gap:14,fontSize:12,color:"var(--text2)",flexWrap:"wrap"}}>
+                <span>📅 {fmtD(ev.fecha)}{ev.fecha_fin&&ev.fecha_fin!==ev.fecha?` → ${fmtD(ev.fecha_fin)}`:""}</span>
+                {ev.lugar&&<span>📍 {ev.lugar}</span>}
+              </div>
+              <div className="sep"/>
+              <div style={{fontSize:13}}>
+                <div style={{color:"var(--text2)",marginBottom:6}}>Equipos ({(ev.equipos||[]).length})</div>
+                {(!ev.equipos||ev.equipos.length===0)&&<div style={{color:"var(--text3)",fontStyle:"italic"}}>Sin equipos registrados</div>}
+                {(ev.equipos||[]).slice(0,4).map((eq,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:3,color:"var(--text)"}}><span>{eq.nombre}</span><span style={{color:"var(--accent)",fontWeight:600}}>x{eq.cantidad}</span></div>
+                ))}
+                {(ev.equipos||[]).length>4&&<div style={{color:"var(--text3)",fontSize:12}}>+{ev.equipos.length-4} más...</div>}
+              </div>
+              {ev.archivado_en&&<div style={{marginTop:10,fontSize:11,color:"var(--text3)"}}>Archivado el {new Date(ev.archivado_en).toLocaleDateString("es-EC")}</div>}
+            </div>
+          ))}
+        </div>}
+      </div>}
+
     </div>
 
     {modal&&<div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModal(null)}>
       {modal.type==="item"&&<ItemModal item={modal.data} onSave={saveItem} onClose={()=>setModal(null)} saving={saving}/>}
-      {modal.type==="delItem"&&<ConfirmModal title="¿Eliminar equipo?" msg={`Se eliminará "${modal.data.nombre}". Esta acción no se puede deshacer.`} onConfirm={()=>deleteItem(modal.data.id)} onClose={()=>setModal(null)} saving={saving}/>}
+      {modal.type==="delItem"&&<DeleteItemModal item={modal.data} onConfirm={(id,motivo)=>deleteItem(id,motivo)} onClose={()=>setModal(null)} saving={saving}/>}
       {modal.type==="event"&&<EventModal event={modal.data} onSave={saveEvent} onClose={()=>setModal(null)} saving={saving}/>}
       {modal.type==="delEvent"&&<ConfirmModal title="¿Eliminar evento?" msg={`Se eliminará "${modal.data.nombre}" y sus equipos asignados.`} onConfirm={()=>deleteEvent(modal.data.id)} onClose={()=>setModal(null)} saving={saving}/>}
       {modal.type==="eeqs"&&<EeqsModal event={modal.data} inventory={inventory} eeqs={eeqs} getAvail={getAvail} onSave={saveEeqs} onClose={()=>setModal(null)} saving={saving}/>}
@@ -546,6 +825,34 @@ function ConfirmModal({title,msg,onConfirm,onClose,saving}){
     <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
       <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
       <button className="btn btn-danger" disabled={saving} onClick={onConfirm}>{saving?"Eliminando...":"Eliminar"}</button>
+    </div>
+  </div>;
+}
+
+/* ── Modal eliminar con campo de motivo ── */
+function DeleteItemModal({item,onConfirm,onClose,saving}){
+  const [motivo,setMotivo]=useState("");
+  return <div className="modal" style={{maxWidth:420}}>
+    <h3 style={{fontFamily:"'Space Grotesk',sans-serif",marginBottom:10}}>🗑 Dar de baja equipo</h3>
+    <p style={{color:"var(--text2)",marginBottom:16,fontSize:14,lineHeight:1.5}}>
+      Se eliminará <strong>"{item.nombre}"</strong> del inventario. Esta acción no se puede deshacer y quedará registrada en el historial de bajas.
+    </p>
+    <div style={{marginBottom:20}}>
+      <label className="label">Motivo / Descripción de la baja *</label>
+      <textarea
+        className="input"
+        rows={3}
+        placeholder="Ej: Equipo dañado, obsoleto, vendido, perdido..."
+        value={motivo}
+        onChange={e=>setMotivo(e.target.value)}
+        style={{resize:"vertical"}}
+      />
+    </div>
+    <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+      <button className="btn btn-danger" disabled={saving||!motivo.trim()} onClick={()=>onConfirm(item.id,motivo.trim())}>
+        {saving?"Eliminando...":"Dar de baja"}
+      </button>
     </div>
   </div>;
 }
@@ -595,8 +902,6 @@ function ItemModal({item,onSave,onClose,saving}){
           <input className="input" type="number" inputMode="numeric" value={f.cantidad_mantenimiento} onChange={e=>s("cantidad_mantenimiento",e.target.value)} placeholder="0" min="0" max={cantTotal} style={{borderColor:(parseFloat(f.cantidad_mantenimiento)||0)>0?"#f59e0b":undefined}}/>
         </div>
       </div>
-
-      {/* NUEVOS CAMPOS */}
       <div className="row2">
         <div>
           <label className="label">📅 Fecha de adquisición</label>
@@ -737,7 +1042,7 @@ function EeqsModal({event,inventory,eeqs,getAvail,onSave,onClose,saving}){
     {sinStock.length>0&&<div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>🔒 Sin stock: {sinStock.map(it=>it.nombre).join(", ")}</div>}
     <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
       <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-      <button className="btn btn-primary" disabled={saving||equipos.some(eq=>eq.cantidad>getMax(eq.inventario_id))} onClick={()=>onSave(event.id,equipos)}>{saving?"Guardando...":"Guardar equipos"}</button>
+      <button className="btn btn-primary" disabled={saving||equipos.some(eq=>eq.cantidad>getAvail(eq.inventario_id,event.id))} onClick={()=>onSave(event.id,equipos)}>{saving?"Guardando...":"Guardar equipos"}</button>
     </div>
   </div>;
 }

@@ -336,7 +336,7 @@ function App(){
   const [toast,setToast]=useState(null);
   const [dark,setDark]=useState(()=>localStorage.getItem("theme")==="dark");
   /* ── nuevos estados ── */
-  const [showDelete,setShowDelete]=useState(true);         // toggle botón borrar
+  const [showDelete,setShowDelete]=useState(()=>localStorage.getItem("showDelete")!=="false"); // toggle botón borrar (default: true)
   const [bajas,setBajas]=useState([]);                      // historial de bajas (Supabase)
   const [archivoEventos,setArchivoEventos]=useState([]);   // archivo de eventos pasados
 
@@ -344,6 +344,10 @@ function App(){
     document.documentElement.setAttribute("data-theme",dark?"dark":"light");
     localStorage.setItem("theme",dark?"dark":"light");
   },[dark]);
+
+  useEffect(()=>{
+    localStorage.setItem("showDelete",showDelete?"true":"false");
+  },[showDelete]);
 
   const showToast=(msg,type="ok")=>{setToast({msg,type});setTimeout(()=>setToast(null),3500);};
 

@@ -160,8 +160,11 @@ const api={
   },
   registrarBaja:(d)=>sb("bajas_inventario",{method:"POST",body:JSON.stringify(d)}),
   getBajas:()=>sb("bajas_inventario?order=fecha_baja.desc"),
+  updateBaja:(id,d)=>sb(`bajas_inventario?id=eq.${id}`,{method:"PATCH",body:JSON.stringify(d),prefer:"return=minimal"}),
+  deleteBaja:(id)=>sb(`bajas_inventario?id=eq.${id}`,{method:"DELETE",prefer:"return=minimal"}),
   archivarEvento:(d)=>sb("eventos_archivo",{method:"POST",body:JSON.stringify(d),prefer:"return=minimal"}),
-  getArchivoEventos:()=>sb("eventos_archivo?order=fecha.desc")
+  getArchivoEventos:()=>sb("eventos_archivo?order=fecha.desc"),
+  deleteArchivoEvento:(id)=>sb(`eventos_archivo?id=eq.${id}`,{method:"DELETE",prefer:"return=minimal"})
 };
 
 const MONTHS=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -170,7 +173,7 @@ const fmt=n=>new Intl.NumberFormat("es-EC",{style:"currency",currency:"USD",mini
 const fmtD=d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;};
 const fmtDateTime=()=>{const now=new Date();return now.toLocaleString("es-EC",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});};
 
-function printBajasReport(bajas){
+function printBajasReport(bajas,rangoLabel){
   const total=bajas.reduce((s,b)=>s+(b.precio||0)*(b.cantidad||0),0);
   const rows=bajas.map(b=>`
     <tr>
@@ -186,7 +189,8 @@ function printBajasReport(bajas){
   <style>
     body{font-family:Arial,Helvetica,sans-serif;padding:30px;color:#1a1a1a;}
     h1{font-size:20px;margin-bottom:2px;}
-    .sub{color:#666;font-size:12px;margin-bottom:20px;}
+    .sub{color:#666;font-size:12px;margin-bottom:4px;}
+    .range{color:#333;font-size:12px;margin-bottom:20px;font-weight:600;}
     table{width:100%;border-collapse:collapse;font-size:12px;}
     th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;}
     th{background:#f2f2f2;}
@@ -196,6 +200,7 @@ function printBajasReport(bajas){
   <body>
     <h1>Reporte de Bajas de Inventario</h1>
     <div class="sub">Generado el ${fmtDateTime()} · ${bajas.length} registro${bajas.length!==1?"s":""}</div>
+    ${rangoLabel?`<div class="range">Rango: ${rangoLabel}</div>`:""}
     <table>
       <thead><tr><th>Fecha de baja</th><th>Equipo</th><th>Descripción</th><th>Cant.</th><th>Precio unit.</th><th>Subtotal</th><th>Motivo</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -207,6 +212,79 @@ function printBajasReport(bajas){
   w.document.close();
   w.onload=()=>{w.focus();w.print();};
 }
+
+/* ── Tabla de bajas con filtro de rango de fechas ── */
+function BajasTabla({bajas,setModal}){
+  const [desde,setDesde]=useState("");
+  const [hasta,setHasta]=useState("");
+
+  const filtradas=React.useMemo(()=>{
+    if(!desde&&!hasta) return bajas;
+    return bajas.filter(b=>{
+      const f=b.fecha_baja?new Date(b.fecha_baja):(b.fecha?new Date(b.fecha):null);
+      if(!f) return true;
+      const fStr=f.toISOString().slice(0,10);
+      if(desde&&fStr<desde) return false;
+      if(hasta&&fStr>hasta) return false;
+      return true;
+    });
+  },[bajas,desde,hasta]);
+
+  const rangoLabel=(desde||hasta)?`${desde?fmtD(desde):"inicio"} → ${hasta?fmtD(hasta):"hoy"}`:null;
+
+  return <>
+    <div className="card" style={{padding:14,marginBottom:14,display:"flex",gap:12,alignItems:"flex-end",flexWrap:"wrap"}}>
+      <div>
+        <label className="label">Desde</label>
+        <input type="date" className="input" value={desde} onChange={e=>setDesde(e.target.value)}/>
+      </div>
+      <div>
+        <label className="label">Hasta</label>
+        <input type="date" className="input" value={hasta} onChange={e=>setHasta(e.target.value)}/>
+      </div>
+      {(desde||hasta)&&<button className="btn btn-ghost btn-sm" onClick={()=>{setDesde("");setHasta("");}}>✕ Limpiar filtro</button>}
+      <div style={{marginLeft:"auto",display:"flex",gap:10,alignItems:"center"}}>
+        <span style={{fontSize:12,color:"var(--text2)"}}>{filtradas.length} de {bajas.length} registro{bajas.length!==1?"s":""}</span>
+        <button className="btn btn-ghost btn-sm" disabled={filtradas.length===0} onClick={()=>printBajasReport(filtradas,rangoLabel)}>🖨️ Imprimir reporte</button>
+      </div>
+    </div>
+
+    {filtradas.length===0&&<div className="card" style={{padding:30,textAlign:"center",color:"var(--text3)"}}>
+      No hay registros en el rango seleccionado.
+    </div>}
+
+    {filtradas.length>0&&<div className="card table-wrap">
+      <table>
+        <thead><tr>
+          <th>Fecha de baja</th>
+          <th>Equipo</th>
+          <th>Descripción</th>
+          <th style={{textAlign:"center"}}>Cantidad</th>
+          <th>Precio unit.</th>
+          <th>Motivo / Descripción</th>
+          <th style={{textAlign:"center"}}>Acciones</th>
+        </tr></thead>
+        <tbody>
+          {filtradas.map(b=>(
+            <tr key={b.id}>
+              <td style={{whiteSpace:"nowrap",fontSize:12,color:"var(--text2)"}}>{b.fecha_baja?new Date(b.fecha_baja).toLocaleString("es-EC"):b.fecha||"—"}</td>
+              <td style={{fontWeight:600}}>{b.nombre}</td>
+              <td style={{color:"var(--text2)",maxWidth:180}}>{b.descripcion||"—"}</td>
+              <td style={{textAlign:"center",fontWeight:700}}>{b.cantidad}</td>
+              <td style={{color:"var(--accent)",fontWeight:600,whiteSpace:"nowrap"}}>{fmt(b.precio)}</td>
+              <td style={{color:"var(--text2)",maxWidth:220}}>{b.motivo}</td>
+              <td style={{textAlign:"center",whiteSpace:"nowrap"}}>
+                <button className="btn btn-ghost btn-sm" style={{padding:"4px 8px"}} title="Editar" onClick={()=>setModal({type:"editBaja",data:b})}>✏️</button>
+                <button className="btn btn-ghost btn-sm" style={{padding:"4px 8px",color:"#dc2626"}} title="Eliminar" onClick={()=>setModal({type:"delBaja",data:b})}>🗑️</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>}
+  </>;
+}
+
 
 /* ── historial de bajas en localStorage ── */
 const BAJA_KEY="eventtech_bajas_v1";
@@ -368,6 +446,27 @@ function App(){
   const saveEeqs=async(evId,eqs)=>{
     setSaving(true);
     try{await api.setEeqs(evId,eqs);showToast("Equipos guardados");await loadAll();setModal(null);}
+    catch(e){showToast("Error: "+e.message,"err");}
+    setSaving(false);
+  };
+
+  const updateBaja=async(id,data)=>{
+    setSaving(true);
+    try{await api.updateBaja(id,data);showToast("Registro de baja actualizado");await loadAll();setModal(null);}
+    catch(e){showToast("Error: "+e.message,"err");}
+    setSaving(false);
+  };
+
+  const deleteBaja=async(id)=>{
+    setSaving(true);
+    try{await api.deleteBaja(id);showToast("Registro eliminado del historial");await loadAll();setModal(null);}
+    catch(e){showToast("Error: "+e.message,"err");}
+    setSaving(false);
+  };
+
+  const deleteArchivoEvento=async(id)=>{
+    setSaving(true);
+    try{await api.deleteArchivoEvento(id);showToast("Evento eliminado del archivo");await loadAll();setModal(null);}
     catch(e){showToast("Error: "+e.message,"err");}
     setSaving(false);
   };
@@ -768,36 +867,14 @@ function App(){
             <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700}}>🗂️ Historial de Bajas</h2>
             <p style={{color:"var(--text2)",fontSize:13,marginTop:2}}>{bajas.length} equipo{bajas.length!==1?"s":""} dado{bajas.length!==1?"s":""} de baja · guardado en Supabase</p>
           </div>
-          {bajas.length>0&&<button className="btn btn-ghost btn-sm" onClick={()=>printBajasReport(bajas)}>🖨️ Imprimir reporte</button>}
         </div>
+
+        {bajas.length>0&&<BajasTabla bajas={bajas} setModal={setModal}/>}
+
         {bajas.length===0&&<div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>
           <div style={{fontSize:36,marginBottom:12}}>📋</div>
           <div style={{fontSize:15,fontWeight:600,marginBottom:4}}>Sin registros de bajas</div>
           <div style={{fontSize:13}}>Cuando des de baja un equipo del inventario, quedará registrado aquí permanentemente.</div>
-        </div>}
-        {bajas.length>0&&<div className="card table-wrap">
-          <table>
-            <thead><tr>
-              <th>Fecha de baja</th>
-              <th>Equipo</th>
-              <th>Descripción</th>
-              <th style={{textAlign:"center"}}>Cantidad</th>
-              <th>Precio unit.</th>
-              <th>Motivo / Descripción</th>
-            </tr></thead>
-            <tbody>
-              {bajas.map(b=>(
-                <tr key={b.id}>
-                  <td style={{whiteSpace:"nowrap",fontSize:12,color:"var(--text2)"}}>{b.fecha_baja?new Date(b.fecha_baja).toLocaleString("es-EC"):b.fecha||"—"}</td>
-                  <td style={{fontWeight:600}}>{b.nombre}</td>
-                  <td style={{color:"var(--text2)",maxWidth:180}}>{b.descripcion||"—"}</td>
-                  <td style={{textAlign:"center",fontWeight:700}}>{b.cantidad}</td>
-                  <td style={{color:"var(--accent)",fontWeight:600,whiteSpace:"nowrap"}}>{fmt(b.precio)}</td>
-                  <td style={{color:"var(--text2)",maxWidth:220}}>{b.motivo}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>}
       </div>}
 
@@ -816,31 +893,39 @@ function App(){
         </div>}
         {archivoEventos.length>0&&<div className="ev-grid">
           {archivoEventos.map(ev=>(
-            <div key={ev.id} className="card" style={{padding:18,borderLeft:`4px solid ${ev.color||"#999"}`,opacity:.85,cursor:"pointer"}} onClick={()=>setModal({type:"archivoDetalle",data:ev})}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-                <div style={{minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                    <div style={{fontWeight:700,fontSize:15}}>{ev.nombre}</div>
-                    <span style={{fontSize:10,fontWeight:700,background:"var(--bg3)",color:"var(--text3)",padding:"1px 7px",borderRadius:20,border:"1px solid var(--border)"}}>ARCHIVADO</span>
+            <div key={ev.id} className="card" style={{padding:18,borderLeft:`4px solid ${ev.color||"#999"}`,opacity:.85,position:"relative"}}>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{position:"absolute",top:10,right:10,padding:"4px 8px",color:"#dc2626",zIndex:2}}
+                title="Eliminar del archivo"
+                onClick={(e)=>{e.stopPropagation();setModal({type:"delArchivo",data:ev});}}
+              >🗑️</button>
+              <div style={{cursor:"pointer"}} onClick={()=>setModal({type:"archivoDetalle",data:ev})}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      <div style={{fontWeight:700,fontSize:15}}>{ev.nombre}</div>
+                      <span style={{fontSize:10,fontWeight:700,background:"var(--bg3)",color:"var(--text3)",padding:"1px 7px",borderRadius:20,border:"1px solid var(--border)"}}>ARCHIVADO</span>
+                    </div>
+                    <div style={{color:"var(--text2)",fontSize:13,marginTop:2}}>{ev.cliente||"—"}</div>
                   </div>
-                  <div style={{color:"var(--text2)",fontSize:13,marginTop:2}}>{ev.cliente||"—"}</div>
                 </div>
+                <div style={{marginTop:10,display:"flex",gap:14,fontSize:12,color:"var(--text2)",flexWrap:"wrap"}}>
+                  <span>📅 {fmtD(ev.fecha)}{ev.fecha_fin&&ev.fecha_fin!==ev.fecha?` → ${fmtD(ev.fecha_fin)}`:""}</span>
+                  {ev.lugar&&<span>📍 {ev.lugar}</span>}
+                </div>
+                <div className="sep"/>
+                <div style={{fontSize:13}}>
+                  <div style={{color:"var(--text2)",marginBottom:6}}>Equipos ({(ev.equipos||[]).length})</div>
+                  {(!ev.equipos||ev.equipos.length===0)&&<div style={{color:"var(--text3)",fontStyle:"italic"}}>Sin equipos registrados</div>}
+                  {(ev.equipos||[]).slice(0,4).map((eq,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:3,color:"var(--text)"}}><span>{eq.nombre}</span><span style={{color:"var(--accent)",fontWeight:600}}>x{eq.cantidad}</span></div>
+                  ))}
+                  {(ev.equipos||[]).length>4&&<div style={{color:"var(--text3)",fontSize:12}}>+{ev.equipos.length-4} más...</div>}
+                </div>
+                {ev.archivado_en&&<div style={{marginTop:10,fontSize:11,color:"var(--text3)"}}>Archivado el {new Date(ev.archivado_en).toLocaleDateString("es-EC")}</div>}
+                <div style={{marginTop:8,fontSize:11,color:"var(--accent)",fontWeight:600}}>Ver detalle →</div>
               </div>
-              <div style={{marginTop:10,display:"flex",gap:14,fontSize:12,color:"var(--text2)",flexWrap:"wrap"}}>
-                <span>📅 {fmtD(ev.fecha)}{ev.fecha_fin&&ev.fecha_fin!==ev.fecha?` → ${fmtD(ev.fecha_fin)}`:""}</span>
-                {ev.lugar&&<span>📍 {ev.lugar}</span>}
-              </div>
-              <div className="sep"/>
-              <div style={{fontSize:13}}>
-                <div style={{color:"var(--text2)",marginBottom:6}}>Equipos ({(ev.equipos||[]).length})</div>
-                {(!ev.equipos||ev.equipos.length===0)&&<div style={{color:"var(--text3)",fontStyle:"italic"}}>Sin equipos registrados</div>}
-                {(ev.equipos||[]).slice(0,4).map((eq,i)=>(
-                  <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:3,color:"var(--text)"}}><span>{eq.nombre}</span><span style={{color:"var(--accent)",fontWeight:600}}>x{eq.cantidad}</span></div>
-                ))}
-                {(ev.equipos||[]).length>4&&<div style={{color:"var(--text3)",fontSize:12}}>+{ev.equipos.length-4} más...</div>}
-              </div>
-              {ev.archivado_en&&<div style={{marginTop:10,fontSize:11,color:"var(--text3)"}}>Archivado el {new Date(ev.archivado_en).toLocaleDateString("es-EC")}</div>}
-              <div style={{marginTop:8,fontSize:11,color:"var(--accent)",fontWeight:600}}>Ver detalle →</div>
             </div>
           ))}
         </div>}
@@ -855,6 +940,9 @@ function App(){
       {modal.type==="delEvent"&&<ConfirmModal title="¿Eliminar evento?" msg={`Se eliminará "${modal.data.nombre}" y sus equipos asignados.`} onConfirm={()=>deleteEvent(modal.data.id)} onClose={()=>setModal(null)} saving={saving}/>}
       {modal.type==="eeqs"&&<EeqsModal event={modal.data} inventory={inventory} eeqs={eeqs} getAvail={getAvail} onSave={saveEeqs} onClose={()=>setModal(null)} saving={saving}/>}
       {modal.type==="archivoDetalle"&&<ArchivoDetalleModal ev={modal.data} onClose={()=>setModal(null)}/>}
+      {modal.type==="editBaja"&&<EditBajaModal baja={modal.data} onSave={updateBaja} onClose={()=>setModal(null)} saving={saving}/>}
+      {modal.type==="delBaja"&&<ConfirmModal title="¿Eliminar registro de baja?" msg={`Se eliminará permanentemente el registro de "${modal.data.nombre}" del historial de bajas.`} onConfirm={()=>deleteBaja(modal.data.id)} onClose={()=>setModal(null)} saving={saving}/>}
+      {modal.type==="delArchivo"&&<ConfirmModal title="¿Eliminar evento del archivo?" msg={`Se eliminará permanentemente "${modal.data.nombre}" del archivo de eventos.`} onConfirm={()=>deleteArchivoEvento(modal.data.id)} onClose={()=>setModal(null)} saving={saving}/>}
     </div>}
   </div>;
 }
@@ -909,6 +997,49 @@ function ArchivoDetalleModal({ev,onClose}){
 
     <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
       <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
+    </div>
+  </div>;
+}
+
+/* ── Modal editar registro de baja ── */
+function EditBajaModal({baja,onSave,onClose,saving}){
+  const [form,setForm]=useState({
+    nombre:baja.nombre||"",
+    descripcion:baja.descripcion||"",
+    cantidad:baja.cantidad||0,
+    precio:baja.precio||0,
+    motivo:baja.motivo||""
+  });
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  return <div className="modal" style={{maxWidth:440}}>
+    <h3 style={{fontFamily:"'Space Grotesk',sans-serif",marginBottom:16}}>✏️ Editar registro de baja</h3>
+    <div style={{display:"grid",gap:14}}>
+      <div>
+        <label className="label">Equipo</label>
+        <input className="input" value={form.nombre} onChange={e=>set("nombre",e.target.value)}/>
+      </div>
+      <div>
+        <label className="label">Descripción</label>
+        <input className="input" value={form.descripcion} onChange={e=>set("descripcion",e.target.value)}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div>
+          <label className="label">Cantidad</label>
+          <input type="number" className="input" value={form.cantidad} onChange={e=>set("cantidad",Number(e.target.value))}/>
+        </div>
+        <div>
+          <label className="label">Precio unit.</label>
+          <input type="number" step="0.01" className="input" value={form.precio} onChange={e=>set("precio",Number(e.target.value))}/>
+        </div>
+      </div>
+      <div>
+        <label className="label">Motivo / Descripción de la baja</label>
+        <textarea className="input" rows={3} value={form.motivo} onChange={e=>set("motivo",e.target.value)}/>
+      </div>
+    </div>
+    <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
+      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+      <button className="btn btn-primary" disabled={saving} onClick={()=>onSave(baja.id,form)}>{saving?"Guardando...":"Guardar cambios"}</button>
     </div>
   </div>;
 }

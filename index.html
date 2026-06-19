@@ -170,6 +170,44 @@ const fmt=n=>new Intl.NumberFormat("es-EC",{style:"currency",currency:"USD",mini
 const fmtD=d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;};
 const fmtDateTime=()=>{const now=new Date();return now.toLocaleString("es-EC",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});};
 
+function printBajasReport(bajas){
+  const total=bajas.reduce((s,b)=>s+(b.precio||0)*(b.cantidad||0),0);
+  const rows=bajas.map(b=>`
+    <tr>
+      <td>${b.fecha_baja?new Date(b.fecha_baja).toLocaleString("es-EC"):(b.fecha||"—")}</td>
+      <td>${(b.nombre||"").replace(/</g,"&lt;")}</td>
+      <td>${(b.descripcion||"—").replace(/</g,"&lt;")}</td>
+      <td style="text-align:center">${b.cantidad}</td>
+      <td style="text-align:right">${fmt(b.precio)}</td>
+      <td style="text-align:right">${fmt((b.precio||0)*(b.cantidad||0))}</td>
+      <td>${(b.motivo||"").replace(/</g,"&lt;")}</td>
+    </tr>`).join("");
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reporte de Bajas</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;padding:30px;color:#1a1a1a;}
+    h1{font-size:20px;margin-bottom:2px;}
+    .sub{color:#666;font-size:12px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;font-size:12px;}
+    th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;}
+    th{background:#f2f2f2;}
+    tfoot td{font-weight:bold;background:#f9f9f9;}
+    @media print{ body{padding:10px;} }
+  </style></head>
+  <body>
+    <h1>Reporte de Bajas de Inventario</h1>
+    <div class="sub">Generado el ${fmtDateTime()} · ${bajas.length} registro${bajas.length!==1?"s":""}</div>
+    <table>
+      <thead><tr><th>Fecha de baja</th><th>Equipo</th><th>Descripción</th><th>Cant.</th><th>Precio unit.</th><th>Subtotal</th><th>Motivo</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="5" style="text-align:right">Total estimado en bajas:</td><td style="text-align:right">${fmt(total)}</td><td></td></tr></tfoot>
+    </table>
+  </body></html>`;
+  const w=window.open("","_blank");
+  w.document.write(html);
+  w.document.close();
+  w.onload=()=>{w.focus();w.print();};
+}
+
 /* ── historial de bajas en localStorage ── */
 const BAJA_KEY="eventtech_bajas_v1";
 const loadBajas=()=>{try{return JSON.parse(localStorage.getItem(BAJA_KEY)||"[]");}catch{return[];}};
@@ -730,6 +768,7 @@ function App(){
             <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700}}>🗂️ Historial de Bajas</h2>
             <p style={{color:"var(--text2)",fontSize:13,marginTop:2}}>{bajas.length} equipo{bajas.length!==1?"s":""} dado{bajas.length!==1?"s":""} de baja · guardado en Supabase</p>
           </div>
+          {bajas.length>0&&<button className="btn btn-ghost btn-sm" onClick={()=>printBajasReport(bajas)}>🖨️ Imprimir reporte</button>}
         </div>
         {bajas.length===0&&<div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>
           <div style={{fontSize:36,marginBottom:12}}>📋</div>
@@ -777,7 +816,7 @@ function App(){
         </div>}
         {archivoEventos.length>0&&<div className="ev-grid">
           {archivoEventos.map(ev=>(
-            <div key={ev.id} className="card" style={{padding:18,borderLeft:`4px solid ${ev.color||"#999"}`,opacity:.85}}>
+            <div key={ev.id} className="card" style={{padding:18,borderLeft:`4px solid ${ev.color||"#999"}`,opacity:.85,cursor:"pointer"}} onClick={()=>setModal({type:"archivoDetalle",data:ev})}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
                 <div style={{minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
@@ -801,6 +840,7 @@ function App(){
                 {(ev.equipos||[]).length>4&&<div style={{color:"var(--text3)",fontSize:12}}>+{ev.equipos.length-4} más...</div>}
               </div>
               {ev.archivado_en&&<div style={{marginTop:10,fontSize:11,color:"var(--text3)"}}>Archivado el {new Date(ev.archivado_en).toLocaleDateString("es-EC")}</div>}
+              <div style={{marginTop:8,fontSize:11,color:"var(--accent)",fontWeight:600}}>Ver detalle →</div>
             </div>
           ))}
         </div>}
@@ -814,6 +854,7 @@ function App(){
       {modal.type==="event"&&<EventModal event={modal.data} onSave={saveEvent} onClose={()=>setModal(null)} saving={saving}/>}
       {modal.type==="delEvent"&&<ConfirmModal title="¿Eliminar evento?" msg={`Se eliminará "${modal.data.nombre}" y sus equipos asignados.`} onConfirm={()=>deleteEvent(modal.data.id)} onClose={()=>setModal(null)} saving={saving}/>}
       {modal.type==="eeqs"&&<EeqsModal event={modal.data} inventory={inventory} eeqs={eeqs} getAvail={getAvail} onSave={saveEeqs} onClose={()=>setModal(null)} saving={saving}/>}
+      {modal.type==="archivoDetalle"&&<ArchivoDetalleModal ev={modal.data} onClose={()=>setModal(null)}/>}
     </div>}
   </div>;
 }
@@ -825,6 +866,49 @@ function ConfirmModal({title,msg,onConfirm,onClose,saving}){
     <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
       <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
       <button className="btn btn-danger" disabled={saving} onClick={onConfirm}>{saving?"Eliminando...":"Eliminar"}</button>
+    </div>
+  </div>;
+}
+
+/* ── Modal detalle de evento archivado ── */
+function ArchivoDetalleModal({ev,onClose}){
+  return <div className="modal" style={{maxWidth:520}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+      <h3 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:19}}>{ev.nombre}</h3>
+      <span style={{fontSize:10,fontWeight:700,background:"var(--bg3)",color:"var(--text3)",padding:"2px 8px",borderRadius:20,border:"1px solid var(--border)",whiteSpace:"nowrap"}}>ARCHIVADO</span>
+    </div>
+    <p style={{color:"var(--text2)",fontSize:13,marginBottom:16}}>{ev.cliente||"Sin cliente registrado"}</p>
+
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+      <div className="card" style={{padding:12}}>
+        <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>📅 Fecha del evento</div>
+        <div style={{fontWeight:600,fontSize:14}}>{fmtD(ev.fecha)}{ev.fecha_fin&&ev.fecha_fin!==ev.fecha?` → ${fmtD(ev.fecha_fin)}`:""}</div>
+      </div>
+      <div className="card" style={{padding:12}}>
+        <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>📍 Lugar</div>
+        <div style={{fontWeight:600,fontSize:14}}>{ev.lugar||"—"}</div>
+      </div>
+    </div>
+
+    <div className="sep"/>
+
+    <div style={{marginBottom:8,fontWeight:600,fontSize:14}}>Materiales enviados ({(ev.equipos||[]).length})</div>
+    {(!ev.equipos||ev.equipos.length===0)&&<div style={{color:"var(--text3)",fontStyle:"italic",fontSize:13}}>Sin equipos registrados para este evento</div>}
+    {(ev.equipos&&ev.equipos.length>0)&&<div className="card table-wrap" style={{marginBottom:16}}>
+      <table>
+        <thead><tr><th>Equipo</th><th style={{textAlign:"center"}}>Cantidad</th></tr></thead>
+        <tbody>
+          {ev.equipos.map((eq,i)=>(
+            <tr key={i}><td>{eq.nombre}</td><td style={{textAlign:"center",fontWeight:700,color:"var(--accent)"}}>x{eq.cantidad}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>}
+
+    {ev.archivado_en&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>Archivado el {new Date(ev.archivado_en).toLocaleString("es-EC")}</div>}
+
+    <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+      <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
     </div>
   </div>;
 }
